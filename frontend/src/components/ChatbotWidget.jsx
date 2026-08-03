@@ -34,7 +34,7 @@ export default function ChatbotWidget() {
           setMessages([
             {
               role: 'bot',
-              text: `🌊 Halo! Saya **OceanBot**.\n\n⚠️ **PERHATIAN:** Saat ini terdapat **${alertsCount} peringatan aktif** di kawasan! Silakan ketik "Ada peringatan aktif?" untuk informasi lebih lanjut.`
+              text: `Selamat datang! Saya OceanBot, asisten virtual Anda.\n\nMohon perhatian, saat ini terdapat ${alertsCount} peringatan aktif di kawasan. Untuk informasi lebih mendetail, silakan ketik "Ada peringatan aktif?".`
             }
           ]);
         } else {
@@ -42,7 +42,7 @@ export default function ChatbotWidget() {
           setMessages([
             {
               role: 'bot',
-              text: '🌊 Halo! Saya **OceanBot**, asisten virtual OceanSmart.\n\nSaya bisa membantu Anda tentang:\n• Kondisi kualitas air terkini\n• Status peringatan dini\n• Informasi biota laut\n\nApa yang ingin Anda ketahui?'
+              text: 'Selamat datang! Saya OceanBot, asisten virtual OceanSmart.\n\nSaya dapat membantu Anda memberikan informasi mengenai:\n• Kondisi kualitas air terkini\n• Status peringatan dini\n• Informasi biota laut\n\nApa yang ingin Anda ketahui hari ini?'
             }
           ]);
         }
@@ -52,7 +52,7 @@ export default function ChatbotWidget() {
         setMessages([
           {
             role: 'bot',
-            text: '🌊 Halo! Saya **OceanBot**, asisten virtual OceanSmart. Apa yang ingin Anda ketahui?'
+            text: 'Selamat datang! Saya OceanBot, asisten virtual OceanSmart. Apa yang ingin Anda ketahui hari ini?'
           }
         ]);
       });
@@ -74,7 +74,7 @@ export default function ChatbotWidget() {
     } catch {
       setMessages(prev => [...prev, {
         role: 'bot',
-        text: '⚠️ Maaf, terjadi kesalahan saat memproses pesan Anda. Pastikan backend sudah berjalan.'
+        text: 'Maaf, terjadi kesalahan saat memproses pesan Anda. Pastikan backend sudah berjalan.'
       }]);
       setBotAnimation('Idle');
     } finally {
@@ -96,7 +96,7 @@ export default function ChatbotWidget() {
   ];
 
   return (
-    <div style={{ position: 'fixed', bottom: '2rem', right: '2rem', zIndex: 9999 }}>
+    <div style={{ position: 'fixed', bottom: '1.75rem', right: '2.5rem', zIndex: 9999 }}>
       {/* Chat Window */}
       {isOpen && (
         <div className="card" style={{
@@ -118,15 +118,17 @@ export default function ChatbotWidget() {
             alignItems: 'center',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', overflow: 'hidden' }}>
+              <div style={{ width: 44, height: 44, overflow: 'visible', position: 'relative' }}>
                 <model-viewer
                   src={botModel}
                   auto-rotate
                   autoplay
                   animation-name={botAnimation}
                   interaction-prompt="none"
-                  style={{ width: '100%', height: '100%', background: 'transparent' }}
+                  style={{ width: '70px', height: '70px', background: 'transparent', position: 'absolute', top: '-13px', left: '-13px' }}
                   camera-controls={false}
+                  shadow-intensity="0"
+                  exposure="1.5"
                 ></model-viewer>
               </div>
               <h3 style={{ margin: 0, fontSize: '1rem', color: '#fff' }}>OceanBot</h3>
@@ -207,25 +209,22 @@ export default function ChatbotWidget() {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
+          title="Tanya OceanBot"
           style={{
-            width: '65px',
-            height: '65px',
+            width: '60px',
+            height: '60px',
             borderRadius: '50%',
-            background: '#fff',
+            background: 'transparent',
             border: 'none',
-            color: '#fff',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
             cursor: 'pointer',
-            boxShadow: '0 4px 20px rgba(0, 150, 199, 0.4)',
             transition: 'transform 0.2s ease',
             marginLeft: 'auto',
-            overflow: 'hidden',
+            overflow: 'visible',
             padding: 0,
-            position: 'relative'
+            position: 'relative',
+            filter: 'drop-shadow(0 6px 16px rgba(0, 119, 182, 0.45))'
           }}
-          onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
+          onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.15)'}
           onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
         >
           <model-viewer
@@ -235,10 +234,12 @@ export default function ChatbotWidget() {
             animation-name={botAnimation}
             interaction-prompt="none"
             camera-controls={false}
-            style={{ width: '130%', height: '130%', position: 'absolute', top: '-15%', left: '-15%', background: 'transparent', pointerEvents: 'none' }}
+            shadow-intensity="0"
+            exposure="1.6"
+            style={{ width: '105px', height: '105px', position: 'absolute', top: '-22px', left: '-22px', background: 'transparent', pointerEvents: 'none' }}
           ></model-viewer>
           {hasAlerts && (
-            <span style={{ position: 'absolute', top: 0, right: 0, background: 'var(--danger)', width: 14, height: 14, borderRadius: '50%', border: '2px solid var(--background)' }}></span>
+            <span style={{ position: 'absolute', top: 0, right: 0, background: 'var(--danger)', width: 12, height: 12, borderRadius: '50%', border: '2px solid var(--background)' }}></span>
           )}
         </button>
       )}

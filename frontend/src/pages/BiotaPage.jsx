@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Fish, Search, Filter, Anchor, Shield } from 'lucide-react';
+import { Fish, Search, Filter, Anchor, Shield, Compass } from 'lucide-react';
 import '@google/model-viewer';
 import api from '../api';
 
@@ -157,7 +157,9 @@ export default function BiotaPage() {
                       {modelSrc ? (
                         <BiotaModelViewer src={modelSrc} />
                       ) : (
-                        <span>{BIOTA_ICONS[i % BIOTA_ICONS.length]}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', background: 'linear-gradient(135deg, #e0f2fe, #bae6fd)' }}>
+                          <Fish size={40} color="#023e8a" />
+                        </div>
                       )}
                     </div>
                     <div className="biota-card-body">
@@ -173,8 +175,8 @@ export default function BiotaPage() {
                       </div>
                       <p>{b.deskripsi}</p>
                       {b.habitat && (
-                        <div style={{ fontSize: '0.75rem', color: 'var(--on-surface-muted)', marginTop: 8 }}>
-                          🏠 Habitat: {b.habitat}
+                        <div style={{ fontSize: '0.75rem', color: 'var(--on-surface-muted)', marginTop: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <Compass size={12} /> Habitat: {b.habitat}
                         </div>
                       )}
                     </div>

@@ -6,7 +6,7 @@ import random
 import math
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
-from app.models import Sensor, SensorReading, Alert, Biota, ConservationZone
+from app.models import Sensor, SensorReading, Alert, Biota, ConservationZone, User
 
 
 # -------------------- THRESHOLDS --------------------
@@ -23,16 +23,27 @@ THRESHOLDS = {
 # -------------------- SENSOR DATA --------------------
 
 SENSORS_DATA = [
-    {"sensor_id": "OS-SENSOR-001", "nama_lokasi": "Cagar Alam Laut Pangandaran", "lat": -7.7100, "lng": 108.6500, "kedalaman_m": 3, "zona": "inti"},
-    {"sensor_id": "OS-SENSOR-002", "nama_lokasi": "Teluk Mangrove Cilacap", "lat": -7.7350, "lng": 108.5800, "kedalaman_m": 2, "zona": "rehabilitasi"},
-    {"sensor_id": "OS-SENSOR-003", "nama_lokasi": "Reef Point Pangandaran", "lat": -7.6950, "lng": 108.6700, "kedalaman_m": 8, "zona": "inti"},
-    {"sensor_id": "OS-SENSOR-004", "nama_lokasi": "Dermaga Nelayan Batu Hiu", "lat": -7.6800, "lng": 108.5900, "kedalaman_m": 1, "zona": "pemanfaatan_umum"},
-    {"sensor_id": "OS-SENSOR-005", "nama_lokasi": "Padang Lamun Karapyak", "lat": -7.7200, "lng": 108.6200, "kedalaman_m": 5, "zona": "pemanfaatan_terbatas"},
-    {"sensor_id": "OS-SENSOR-006", "nama_lokasi": "Karang Deep Nusa Kambangan", "lat": -7.7500, "lng": 108.7000, "kedalaman_m": 15, "zona": "inti"},
-    {"sensor_id": "OS-SENSOR-007", "nama_lokasi": "Muara Sungai Citanduy", "lat": -7.7000, "lng": 108.5500, "kedalaman_m": 1, "zona": "rehabilitasi"},
-    {"sensor_id": "OS-SENSOR-008", "nama_lokasi": "Pantai Pasir Putih Pangandaran", "lat": -7.6900, "lng": 108.6600, "kedalaman_m": 4, "zona": "pemanfaatan_terbatas"},
-    {"sensor_id": "OS-SENSOR-009", "nama_lokasi": "Coral Garden Pananjung", "lat": -7.7150, "lng": 108.6400, "kedalaman_m": 10, "zona": "inti"},
-    {"sensor_id": "OS-SENSOR-010", "nama_lokasi": "Titik Lepas Pantai Selatan", "lat": -7.7600, "lng": 108.6300, "kedalaman_m": 20, "zona": "pemanfaatan_terbatas"},
+    # Pangandaran (Pesisir Selatan Jabar)
+    {"sensor_id": "OS-SENSOR-001", "nama_lokasi": "Cagar Alam Laut Pangandaran", "lat": -7.7100, "lng": 108.6500, "kedalaman_m": 3, "zona": "inti", "kabupaten": "Pangandaran"},
+    {"sensor_id": "OS-SENSOR-002", "nama_lokasi": "Padang Lamun Karapyak Pangandaran", "lat": -7.7200, "lng": 108.6200, "kedalaman_m": 5, "zona": "pemanfaatan_terbatas", "kabupaten": "Pangandaran"},
+    {"sensor_id": "OS-SENSOR-003", "nama_lokasi": "Dermaga Batu Hiu Pangandaran", "lat": -7.6800, "lng": 108.5900, "kedalaman_m": 1, "zona": "pemanfaatan_umum", "kabupaten": "Pangandaran"},
+    
+    # Sukabumi / Pelabuhan Ratu (Pesisir Selatan Jabar)
+    {"sensor_id": "OS-SENSOR-004", "nama_lokasi": "Teluk Pelabuhan Ratu Sukabumi", "lat": -6.9800, "lng": 106.5500, "kedalaman_m": 12, "zona": "inti", "kabupaten": "Sukabumi"},
+    {"sensor_id": "OS-SENSOR-005", "nama_lokasi": "Karang Hawu Pelabuhan Ratu", "lat": -6.9500, "lng": 106.4500, "kedalaman_m": 6, "zona": "pemanfaatan_terbatas", "kabupaten": "Sukabumi"},
+
+    # Indramayu (Pantura Jabar)
+    {"sensor_id": "OS-SENSOR-006", "nama_lokasi": "Hutan Mangrove Karangsong Indramayu", "lat": -6.3300, "lng": 108.3600, "kedalaman_m": 2, "zona": "rehabilitasi", "kabupaten": "Indramayu"},
+    {"sensor_id": "OS-SENSOR-007", "nama_lokasi": "Pantai Tirta Maya Indramayu", "lat": -6.3800, "lng": 108.4200, "kedalaman_m": 4, "zona": "pemanfaatan_umum", "kabupaten": "Indramayu"},
+
+    # Cirebon (Pantura Jabar)
+    {"sensor_id": "OS-SENSOR-008", "nama_lokasi": "Pesisir Kejawanan Cirebon", "lat": -6.7300, "lng": 108.5700, "kedalaman_m": 3, "zona": "rehabilitasi", "kabupaten": "Cirebon"},
+
+    # Karawang (Pantura Jabar)
+    {"sensor_id": "OS-SENSOR-009", "nama_lokasi": "Tanjung Pakis Karawang", "lat": -5.9600, "lng": 107.1600, "kedalaman_m": 2, "zona": "pemanfaatan_terbatas", "kabupaten": "Karawang"},
+
+    # Subang (Pantura Jabar)
+    {"sensor_id": "OS-SENSOR-010", "nama_lokasi": "Pantai Pondok Bali Subang", "lat": -6.2100, "lng": 107.8200, "kedalaman_m": 3, "zona": "pemanfaatan_umum", "kabupaten": "Subang"},
 ]
 
 
@@ -165,6 +176,44 @@ def calculate_health_index(ph, suhu, salinitas, do_val, kekeruhan) -> float:
     return round(sum(scores) / len(scores), 1)
 
 
+# -------------------- REAL-TIME TELEMETRY CACHE --------------------
+
+REALTIME_OCEAN_CACHE = {
+    "last_fetched": None,
+    "sea_temperature": 28.2,
+    "wave_height": 1.1
+}
+
+def update_realtime_ocean_cache():
+    import urllib.request
+    import json
+    from datetime import datetime
+    
+    # Hanya lakukan request baru setiap 5 menit sekali agar tidak diblokir/rate-limit
+    now = datetime.utcnow()
+    last = REALTIME_OCEAN_CACHE["last_fetched"]
+    if last is not None and (now - last).total_seconds() < 300:
+        return
+        
+    try:
+        url = "https://marine-api.open-meteo.com/v1/marine?latitude=-7.71&longitude=108.65&current=wave_height,sea_temperature"
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=4) as response:
+            data = json.loads(response.read().decode())
+            current = data.get("current", {})
+            temp = current.get("sea_temperature")
+            wave = current.get("wave_height")
+            if temp is not None:
+                REALTIME_OCEAN_CACHE["sea_temperature"] = float(temp)
+            if wave is not None:
+                REALTIME_OCEAN_CACHE["wave_height"] = float(wave)
+            REALTIME_OCEAN_CACHE["last_fetched"] = now
+            print(f"[Realtime API Sync] Berhasil! Suhu: {temp}°C, Tinggi Gelombang: {wave}m")
+    except Exception as e:
+        print("[Realtime API Sync] Gagal, menggunakan data fallback seeder:", e)
+
+
+
 def generate_reading(base_time: datetime, sensor_data: dict, day_offset: int = 0) -> dict:
     """Generate a single sensor reading with realistic variations."""
     # Add time-of-day variations
@@ -174,11 +223,20 @@ def generate_reading(base_time: datetime, sensor_data: dict, day_offset: int = 0
     # Base values with sensor-specific bias
     depth_factor = sensor_data["kedalaman_m"] / 20.0
 
-    ph = 8.05 + random.gauss(0, 0.08) - depth_factor * 0.05
-    suhu = 28.0 + day_factor * 0.8 + random.gauss(0, 0.3) - depth_factor * 0.5
-    salinitas = 32.5 + random.gauss(0, 0.5) + depth_factor * 0.3
-    do_val = 6.5 + day_factor * 0.5 + random.gauss(0, 0.4) - depth_factor * 0.3
-    kekeruhan = 3.5 + random.gauss(0, 1.0) + (0.5 if sensor_data["zona"] == "rehabilitasi" else 0)
+    # Gunakan telemetri asli Jawa Barat (Pangandaran) jika data real-time (day_offset == 0)
+    base_temp = 28.0
+    base_wave = 1.0
+    if day_offset == 0:
+        base_temp = REALTIME_OCEAN_CACHE["sea_temperature"]
+        base_wave = REALTIME_OCEAN_CACHE["wave_height"]
+
+    ph = 8.05 + random.gauss(0, 0.05) - depth_factor * 0.05
+    suhu = base_temp + day_factor * 0.5 + random.gauss(0, 0.2) - depth_factor * 0.5
+    salinitas = 32.5 + random.gauss(0, 0.3) + depth_factor * 0.3
+    
+    # DO & kekeruhan bereaksi secara dinamis dengan tinggi gelombang asli Jawa Barat
+    do_val = 6.2 + (base_wave * 0.4) + day_factor * 0.3 + random.gauss(0, 0.2) - depth_factor * 0.3
+    kekeruhan = 1.5 + (base_wave * 1.8) + random.gauss(0, 0.5) + (0.5 if sensor_data["zona"] == "rehabilitasi" else 0)
 
     # ~5% chance of anomaly
     if random.random() < 0.05:
@@ -249,10 +307,28 @@ def check_thresholds_and_create_alert(reading: dict) -> dict | None:
 
 def seed_database(db: Session):
     """Main seeder function to populate the database with dummy data."""
+    # 0. Create default users (seeded independently of sensor data check)
+    admin_user = db.query(User).filter(User.email == "admin@oceansmart.id").first()
+    if not admin_user:
+        db.add(User(
+            email="admin@oceansmart.id",
+            nama="Admin OceanSmart",
+            password_hash="admin123", # Plain text for simplicity/reliability
+            role="operator"
+        ))
+        db.add(User(
+            email="user@oceansmart.id",
+            nama="Budi Santoso",
+            password_hash="user123",
+            role="pengguna"
+        ))
+        db.commit()
+        print("  [OK] Default users seeded (admin@oceansmart.id / admin123)")
+
     # Check if data already exists
     existing = db.query(Sensor).first()
     if existing:
-        print("Database already seeded. Skipping.")
+        print("Database already seeded. Skipping sensor seeding.")
         return
 
     print("[SEED] Seeding OceanSmart database...")

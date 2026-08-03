@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, desc, and_
 
 from app.database import engine, get_db, Base
-from app.models import Sensor, SensorReading, Alert, Biota, ConservationZone, CitizenReport
+from app.models import Sensor, SensorReading, Alert, Biota, ConservationZone, CitizenReport, User
 from app.seeder import seed_database, THRESHOLDS, calculate_health_index
 
 # -------------------- APP INIT --------------------
@@ -43,11 +43,14 @@ def startup():
         
     # Start Realtime Data Generator
     from apscheduler.schedulers.background import BackgroundScheduler
-    from app.seeder import SENSORS_DATA, generate_reading, check_thresholds_and_create_alert
+    from app.seeder import SENSORS_DATA, generate_reading, check_thresholds_and_create_alert, update_realtime_ocean_cache
     
     def generate_realtime_data():
         db = next(get_db())
         try:
+            # Sinkronisasi parameter laut real-time Jawa Barat (Pangandaran)
+            update_realtime_ocean_cache()
+            
             now = datetime.utcnow()
             for sensor_data in SENSORS_DATA:
                 reading = generate_reading(now, sensor_data, 0)
@@ -232,6 +235,56 @@ def get_sensor_readings(
     return result
 
 
+# -------------------- SENSORS OPERATOR CRUD --------------------
+
+@app.post("/api/sensors")
+def create_sensor(body: dict, db: Session = Depends(get_db)):
+    """[Operator] Tambah sensor baru."""
+    import uuid
+    sensor_id = body.get("sensor_id") or f"SNS-{uuid.uuid4().hex[:6].upper()}"
+    if db.query(Sensor).filter(Sensor.sensor_id == sensor_id).first():
+        raise HTTPException(status_code=400, detail="sensor_id sudah ada")
+    sensor = Sensor(
+        sensor_id=sensor_id,
+        nama_lokasi=body.get("nama_lokasi", ""),
+        lat=float(body.get("lat", 0)),
+        lng=float(body.get("lng", 0)),
+        kedalaman_m=float(body.get("kedalaman_m", 0)),
+        zona=body.get("zona", "pemanfaatan_umum"),
+        status_koneksi=body.get("status_koneksi", "online"),
+        status_baterai=int(body.get("status_baterai", 100)),
+    )
+    db.add(sensor)
+    db.commit()
+    db.refresh(sensor)
+    return {"message": "Sensor berhasil ditambahkan", "sensor_id": sensor.sensor_id}
+
+
+@app.put("/api/sensors/{sensor_id}/update")
+def update_sensor(sensor_id: str, body: dict, db: Session = Depends(get_db)):
+    """[Operator] Update sensor."""
+    sensor = db.query(Sensor).filter(Sensor.sensor_id == sensor_id).first()
+    if not sensor:
+        raise HTTPException(status_code=404, detail="Sensor tidak ditemukan")
+    for field in ["nama_lokasi", "lat", "lng", "kedalaman_m", "zona", "status_koneksi", "status_baterai"]:
+        if field in body:
+            setattr(sensor, field, body[field])
+    db.commit()
+    return {"message": "Sensor berhasil diperbarui"}
+
+
+@app.delete("/api/sensors/{sensor_id}/delete")
+def delete_sensor(sensor_id: str, db: Session = Depends(get_db)):
+    """[Operator] Hapus sensor beserta semua readingnya."""
+    sensor = db.query(Sensor).filter(Sensor.sensor_id == sensor_id).first()
+    if not sensor:
+        raise HTTPException(status_code=404, detail="Sensor tidak ditemukan")
+    db.query(SensorReading).filter(SensorReading.sensor_id == sensor_id).delete()
+    db.delete(sensor)
+    db.commit()
+    return {"message": "Sensor berhasil dihapus"}
+
+
 # -------------------- ALERTS --------------------
 
 @app.get("/api/alerts")
@@ -313,6 +366,55 @@ def get_biota_detail(biota_id: str, db: Session = Depends(get_db)):
         "foto_url": b.foto_url,
         "habitat": b.habitat,
     }
+
+
+# -------------------- BIOTA OPERATOR CRUD --------------------
+
+@app.post("/api/biota")
+def create_biota(body: dict, db: Session = Depends(get_db)):
+    """[Operator] Tambah spesies biota baru."""
+    import uuid
+    biota_id = body.get("biota_id") or f"BIO-{uuid.uuid4().hex[:6].upper()}"
+    if db.query(Biota).filter(Biota.biota_id == biota_id).first():
+        raise HTTPException(status_code=400, detail="biota_id sudah ada")
+    b = Biota(
+        biota_id=biota_id,
+        nama_umum=body.get("nama_umum", ""),
+        nama_ilmiah=body.get("nama_ilmiah", ""),
+        zona_kedalaman=body.get("zona_kedalaman", "epipelagik"),
+        status_konservasi=body.get("status_konservasi", "Data Deficient"),
+        deskripsi=body.get("deskripsi", ""),
+        foto_url=body.get("foto_url", ""),
+        habitat=body.get("habitat", ""),
+    )
+    db.add(b)
+    db.commit()
+    db.refresh(b)
+    return {"message": "Biota berhasil ditambahkan", "biota_id": b.biota_id}
+
+
+@app.put("/api/biota/{biota_id}/update")
+def update_biota(biota_id: str, body: dict, db: Session = Depends(get_db)):
+    """[Operator] Update data spesies biota."""
+    b = db.query(Biota).filter(Biota.biota_id == biota_id).first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Biota tidak ditemukan")
+    for field in ["nama_umum", "nama_ilmiah", "zona_kedalaman", "status_konservasi", "deskripsi", "foto_url", "habitat"]:
+        if field in body:
+            setattr(b, field, body[field])
+    db.commit()
+    return {"message": "Biota berhasil diperbarui"}
+
+
+@app.delete("/api/biota/{biota_id}/delete")
+def delete_biota(biota_id: str, db: Session = Depends(get_db)):
+    """[Operator] Hapus spesies biota."""
+    b = db.query(Biota).filter(Biota.biota_id == biota_id).first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Biota tidak ditemukan")
+    db.delete(b)
+    db.commit()
+    return {"message": "Biota berhasil dihapus"}
 
 
 # -------------------- CONSERVATION ZONES --------------------
@@ -439,7 +541,90 @@ async def chatbot_message(
     return {"reply": reply, "context_used": False}
 
 
+# -------------------- AUTHENTICATION --------------------
+
+@app.post("/api/register")
+def register_user(body: dict, db: Session = Depends(get_db)):
+    nama = body.get("nama")
+    email = body.get("email")
+    password = body.get("password")
+    role = body.get("role", "pengguna")
+    
+    if not email or not password or not nama:
+        raise HTTPException(status_code=400, detail="Semua field wajib diisi")
+    
+    existing = db.query(User).filter(User.email == email).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Email sudah terdaftar. Silakan masuk.")
+        
+    # Auto-detect role operator if email contains admin/operator
+    lower_email = email.lower()
+    if "admin" in lower_email or "operator" in lower_email:
+        role = "operator"
+
+    new_user = User(
+        email=email,
+        nama=nama,
+        password_hash=password,
+        role=role
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return {"message": "Registrasi berhasil! Silakan masuk.", "email": email}
+
+
+@app.post("/api/login")
+def login_user(body: dict, db: Session = Depends(get_db)):
+    email = body.get("email")
+    password = body.get("password")
+    
+    if not email or not password:
+        raise HTTPException(status_code=400, detail="Email dan password wajib diisi")
+        
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Email tidak terdaftar. Silakan daftar terlebih dahulu.")
+        
+    if user.password_hash != password:
+        raise HTTPException(status_code=401, detail="Kata sandi salah")
+        
+    return {
+        "name": user.nama,
+        "email": user.email,
+        "role": user.role
+    }
+
+
+@app.post("/api/login/google")
+def login_google(body: dict, db: Session = Depends(get_db)):
+    email = body.get("email")
+    nama = body.get("nama")
+    google_id = body.get("google_id")
+    
+    if not email:
+        raise HTTPException(status_code=400, detail="Email Google tidak valid")
+        
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(
+            status_code=404, 
+            detail="Akun Google Anda belum terdaftar. Silakan daftar terlebih dahulu."
+        )
+        
+    if not user.google_id:
+        user.google_id = google_id
+        db.commit()
+        
+    return {
+        "name": user.nama,
+        "email": user.email,
+        "role": user.role
+    }
+
+
 # -------------------- ROOT --------------------
+
 
 @app.get("/")
 def root():

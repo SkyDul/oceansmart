@@ -52,6 +52,18 @@ class ZoneType(str, enum.Enum):
 
 # ──────────────────── MODELS ────────────────────
 
+class User(Base):
+    """System users and administrators."""
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(255), unique=True, nullable=False, index=True)
+    password_hash = Column(String(255), nullable=True) # Nullable for OAuth users
+    nama = Column(String(255), nullable=False)
+    role = Column(String(50), default="pengguna")  # 'pengguna' | 'operator'
+    google_id = Column(String(255), unique=True, nullable=True, index=True)
+    created_at = Column(DateTime, server_default=func.now())
+
 class Sensor(Base):
     """Sensor stations placed in the conservation area."""
     __tablename__ = "sensors"
