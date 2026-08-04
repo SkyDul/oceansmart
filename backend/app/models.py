@@ -61,7 +61,10 @@ class User(Base):
     password_hash = Column(String(255), nullable=True) # Nullable for OAuth users
     nama = Column(String(255), nullable=False)
     role = Column(String(50), default="pengguna")  # 'pengguna' | 'operator'
+    provinsi = Column(String(100), nullable=True)
+    wilayah = Column(String(100), nullable=True)
     google_id = Column(String(255), unique=True, nullable=True, index=True)
+    no_hp = Column(String(50), nullable=True)
     created_at = Column(DateTime, server_default=func.now())
 
 class Sensor(Base):
@@ -73,6 +76,8 @@ class Sensor(Base):
     nama_lokasi = Column(String(200), nullable=False)
     lat = Column(Float, nullable=False)
     lng = Column(Float, nullable=False)
+    provinsi = Column(String(100), nullable=True)
+    wilayah = Column(String(100), nullable=True)
     kedalaman_m = Column(Float, default=0)
     zona = Column(String(50), default="pemanfaatan_umum")
     status_koneksi = Column(String(20), default="online")

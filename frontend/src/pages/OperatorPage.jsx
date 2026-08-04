@@ -1,21 +1,20 @@
 import { useState, useEffect } from 'react';
-import { Settings, Cpu, Fish, Plus, Trash2, Edit3, Save, X, Wifi, WifiOff, RefreshCw } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Settings, Cpu, Fish, Plus, Trash2, Edit3, Save, X, Wifi, WifiOff, RefreshCw, ExternalLink, Users, Shield } from 'lucide-react';
 import api from '../api';
 
 export default function OperatorPage() {
-  const [activeTab, setActiveTab] = useState('sensor');
+  const navigate = useNavigate();
+  const userRole = localStorage.getItem('ocean_role') || 'pengguna';
+  const [activeTab, setActiveTab] = useState(userRole === 'admin' ? 'operator' : 'sensor');
   const [sensors, setSensors] = useState([]);
   const [species, setSpecies] = useState([]);
   const [loadingSensors, setLoadingSensors] = useState(true);
   const [loadingSpecies, setLoadingSpecies] = useState(true);
-  const [showSensorForm, setShowSensorForm] = useState(false);
-  const [showSpeciesForm, setShowSpeciesForm] = useState(false);
-  const [editingSensor, setEditingSensor] = useState(null);
-  const [editingSpecies, setEditingSpecies] = useState(null);
-  const [savingS, setSavingS] = useState(false);
-  const [savingB, setSavingB] = useState(false);
-  const [sensorForm, setSensorForm] = useState({ nama_lokasi: '', zona: 'pemanfaatan_umum', lat: '', lng: '', kedalaman_m: 0, status_koneksi: 'online', status_baterai: 100 });
-  const [speciesForm, setSpeciesForm] = useState({ nama_umum: '', nama_ilmiah: '', status_konservasi: 'Data Deficient', habitat: '', zona_kedalaman: 'epipelagik', deskripsi: '', foto_url: '' });
+
+  // States for Operator Management (Admin only)
+  const [operators, setOperators] = useState([]);
+  const [loadingOperators, setLoadingOperators] = useState(false);
 
   // ── Fetch dari backend ──
   const fetchSensors = () => {
@@ -28,35 +27,15 @@ export default function OperatorPage() {
     api.get('/biota').then(res => setSpecies(res.data)).catch(() => {}).finally(() => setLoadingSpecies(false));
   };
 
-  useEffect(() => { fetchSensors(); fetchSpecies(); }, []);
+  const fetchOperators = () => {
+    if (userRole !== 'admin') return;
+    setLoadingOperators(true);
+    api.get('/operators').then(res => setOperators(res.data)).catch(() => {}).finally(() => setLoadingOperators(false));
+  };
+
+  useEffect(() => { fetchSensors(); fetchSpecies(); fetchOperators(); }, []);
 
   // ── SENSOR HANDLERS ──
-  const handleSaveSensor = async () => {
-    if (!sensorForm.nama_lokasi || !sensorForm.lat || !sensorForm.lng) return;
-    setSavingS(true);
-    try {
-      if (editingSensor) {
-        await api.put(`/sensors/${editingSensor.sensor_id}/update`, sensorForm);
-      } else {
-        await api.post('/sensors', sensorForm);
-      }
-      fetchSensors();
-      setShowSensorForm(false);
-      setEditingSensor(null);
-      setSensorForm({ nama_lokasi: '', zona: 'pemanfaatan_umum', lat: '', lng: '', kedalaman_m: 0, status_koneksi: 'online', status_baterai: 100 });
-    } catch (e) {
-      alert('Gagal menyimpan: ' + (e.response?.data?.detail || e.message));
-    } finally {
-      setSavingS(false);
-    }
-  };
-
-  const handleEditSensor = (s) => {
-    setEditingSensor(s);
-    setSensorForm({ nama_lokasi: s.nama_lokasi, zona: s.zona, lat: s.lat, lng: s.lng, kedalaman_m: s.kedalaman_m, status_koneksi: s.status_koneksi, status_baterai: s.status_baterai });
-    setShowSensorForm(true);
-  };
-
   const handleDeleteSensor = async (s) => {
     if (!window.confirm(`Hapus sensor "${s.nama_lokasi}"? Semua data readingnya akan ikut terhapus.`)) return;
     try {
@@ -68,37 +47,24 @@ export default function OperatorPage() {
   };
 
   // ── BIOTA HANDLERS ──
-  const handleSaveSpecies = async () => {
-    if (!speciesForm.nama_umum) return;
-    setSavingB(true);
-    try {
-      if (editingSpecies) {
-        await api.put(`/biota/${editingSpecies.biota_id}/update`, speciesForm);
-      } else {
-        await api.post('/biota', speciesForm);
-      }
-      fetchSpecies();
-      setShowSpeciesForm(false);
-      setEditingSpecies(null);
-      setSpeciesForm({ nama_umum: '', nama_ilmiah: '', status_konservasi: 'Data Deficient', habitat: '', zona_kedalaman: 'epipelagik', deskripsi: '', foto_url: '' });
-    } catch (e) {
-      alert('Gagal menyimpan: ' + (e.response?.data?.detail || e.message));
-    } finally {
-      setSavingB(false);
-    }
-  };
-
-  const handleEditSpecies = (s) => {
-    setEditingSpecies(s);
-    setSpeciesForm({ nama_umum: s.nama_umum, nama_ilmiah: s.nama_ilmiah || '', status_konservasi: s.status_konservasi || 'Data Deficient', habitat: s.habitat || '', zona_kedalaman: s.zona_kedalaman || 'epipelagik', deskripsi: s.deskripsi || '', foto_url: s.foto_url || '' });
-    setShowSpeciesForm(true);
-  };
 
   const handleDeleteSpecies = async (s) => {
     if (!window.confirm(`Hapus spesies "${s.nama_umum}"?`)) return;
     try {
       await api.delete(`/biota/${s.biota_id}/delete`);
       fetchSpecies();
+    } catch (e) {
+      alert('Gagal menghapus: ' + (e.response?.data?.detail || e.message));
+    }
+  };
+
+  // ── OPERATOR HANDLERS (Admin Only) ──
+
+  const handleDeleteOp = async (op) => {
+    if (!window.confirm(`Hapus operator "${op.nama}"?`)) return;
+    try {
+      await api.delete(`/operators/${op.id}`);
+      fetchOperators();
     } catch (e) {
       alert('Gagal menghapus: ' + (e.response?.data?.detail || e.message));
     }
@@ -116,15 +82,19 @@ export default function OperatorPage() {
             <Settings size={20} color="#fff" />
           </div>
           <div>
-            <h1 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Panel Operator</h1>
-            <p style={{ color: '#64748b', margin: 0, fontSize: '0.875rem' }}>Kelola Sensor IoT & Katalog Biota Laut — terhubung langsung ke database</p>
+            <h1 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Panel Manajemen</h1>
+            <p style={{ color: '#64748b', margin: 0, fontSize: '0.875rem' }}>Kelola {userRole === 'admin' && 'Akun Operator, '}Sensor IoT & Katalog Biota Laut — terhubung langsung ke database</p>
           </div>
         </div>
       </div>
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', background: '#e2e8f0', padding: '0.25rem', borderRadius: '0.75rem', width: 'fit-content' }}>
-        {[{ id: 'sensor', label: 'Sensor IoT', icon: Cpu }, { id: 'biota', label: 'Biota Laut', icon: Fish }].map(tab => (
+        {[
+          ...(userRole === 'admin' ? [{ id: 'operator', label: 'Operator Wilayah', icon: Users }] : []),
+          { id: 'sensor', label: 'Sensor IoT', icon: Cpu },
+          { id: 'biota', label: 'Biota Laut', icon: Fish }
+        ].map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{ padding: '0.625rem 1.5rem', borderRadius: '0.625rem', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, fontSize: '0.875rem', background: activeTab === tab.id ? '#fff' : 'transparent', color: activeTab === tab.id ? '#023e8a' : '#64748b', boxShadow: activeTab === tab.id ? '0 2px 8px rgba(0,0,0,0.08)' : 'none', transition: 'all 0.2s' }}>
             <tab.icon size={16} />{tab.label}
           </button>
@@ -140,51 +110,14 @@ export default function OperatorPage() {
               <button onClick={fetchSensors} style={{ padding: '0.5rem', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '0.5rem', cursor: 'pointer' }} title="Refresh">
                 <RefreshCw size={16} color="#64748b" />
               </button>
-              <button onClick={() => { setShowSensorForm(true); setEditingSensor(null); setSensorForm({ nama_lokasi: '', zona: 'pemanfaatan_umum', lat: '', lng: '', kedalaman_m: 0, status_koneksi: 'online', status_baterai: 100 }); }} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.625rem 1.25rem', background: '#023e8a', color: '#fff', border: 'none', borderRadius: '0.625rem', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer' }}>
+              <button
+                id="btn-tambah-sensor"
+                onClick={() => navigate('/operator/sensors/add')}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.625rem 1.25rem', background: 'linear-gradient(135deg, #023e8a, #0096c7)', color: '#fff', border: 'none', borderRadius: '0.625rem', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer', boxShadow: '0 4px 12px rgba(2,62,138,0.25)' }}>
                 <Plus size={16} /> Tambah Sensor
               </button>
             </div>
           </div>
-
-          {showSensorForm && (
-            <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '1rem', padding: '1.5rem', marginBottom: '1.5rem', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-              <h3 style={{ margin: '0 0 1.25rem', fontWeight: 700, color: '#0f172a' }}>{editingSensor ? `Edit: ${editingSensor.nama_lokasi}` : 'Tambah Sensor Baru'}</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <label style={labelStyle}>Nama Lokasi Sensor *</label>
-                  <input style={inputStyle} value={sensorForm.nama_lokasi} onChange={e => setSensorForm(p => ({ ...p, nama_lokasi: e.target.value }))} placeholder="mis. Sensor A1 - Gili Matra" />
-                </div>
-                <div><label style={labelStyle}>Latitude *</label><input style={inputStyle} type="number" step="0.0001" value={sensorForm.lat} onChange={e => setSensorForm(p => ({ ...p, lat: e.target.value }))} placeholder="-8.35" /></div>
-                <div><label style={labelStyle}>Longitude *</label><input style={inputStyle} type="number" step="0.0001" value={sensorForm.lng} onChange={e => setSensorForm(p => ({ ...p, lng: e.target.value }))} placeholder="116.5" /></div>
-                <div>
-                  <label style={labelStyle}>Zona Konservasi</label>
-                  <select style={inputStyle} value={sensorForm.zona} onChange={e => setSensorForm(p => ({ ...p, zona: e.target.value }))}>
-                    <option value="inti">Zona Inti</option>
-                    <option value="pemanfaatan_terbatas">Pemanfaatan Terbatas</option>
-                    <option value="rehabilitasi">Rehabilitasi</option>
-                    <option value="pemanfaatan_umum">Pemanfaatan Umum</option>
-                  </select>
-                </div>
-                <div>
-                  <label style={labelStyle}>Status Koneksi</label>
-                  <select style={inputStyle} value={sensorForm.status_koneksi} onChange={e => setSensorForm(p => ({ ...p, status_koneksi: e.target.value }))}>
-                    <option value="online">Online</option>
-                    <option value="offline">Offline</option>
-                  </select>
-                </div>
-                <div><label style={labelStyle}>Kedalaman (m)</label><input style={inputStyle} type="number" value={sensorForm.kedalaman_m} onChange={e => setSensorForm(p => ({ ...p, kedalaman_m: Number(e.target.value) }))} /></div>
-                <div><label style={labelStyle}>Status Baterai (%)</label><input style={inputStyle} type="number" min="0" max="100" value={sensorForm.status_baterai} onChange={e => setSensorForm(p => ({ ...p, status_baterai: Number(e.target.value) }))} /></div>
-              </div>
-              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.25rem' }}>
-                <button onClick={handleSaveSensor} disabled={savingS} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.625rem 1.5rem', background: '#023e8a', color: '#fff', border: 'none', borderRadius: '0.625rem', fontWeight: 600, cursor: 'pointer', opacity: savingS ? 0.7 : 1 }}>
-                  <Save size={16} /> {savingS ? 'Menyimpan...' : 'Simpan ke DB'}
-                </button>
-                <button onClick={() => setShowSensorForm(false)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.625rem 1.25rem', background: '#f1f5f9', color: '#64748b', border: '1px solid #cbd5e1', borderRadius: '0.625rem', fontWeight: 600, cursor: 'pointer' }}>
-                  <X size={16} /> Batal
-                </button>
-              </div>
-            </div>
-          )}
 
           {loadingSensors ? (
             <div style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>Memuat data sensor dari database...</div>
@@ -222,7 +155,7 @@ export default function OperatorPage() {
                       </td>
                       <td style={{ padding: '0.875rem 1rem' }}>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          <button onClick={() => handleEditSensor(s)} style={{ padding: '0.375rem 0.75rem', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '0.5rem', color: '#1d4ed8', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.8125rem', fontWeight: 600 }}>
+                          <button onClick={() => navigate(`/operator/sensors/edit/${s.sensor_id}`)} style={{ padding: '0.375rem 0.75rem', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '0.5rem', color: '#1d4ed8', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.8125rem', fontWeight: 600 }}>
                             <Edit3 size={14} /> Edit
                           </button>
                           <button onClick={() => handleDeleteSensor(s)} style={{ padding: '0.375rem 0.75rem', background: '#fff1f2', border: '1px solid #fecdd3', borderRadius: '0.5rem', color: '#be123c', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.8125rem', fontWeight: 600 }}>
@@ -246,53 +179,11 @@ export default function OperatorPage() {
             <h2 style={{ fontSize: '1.125rem', fontWeight: 700, color: '#0f172a', margin: 0 }}>Katalog Biota Laut ({species.length}) <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 400 }}>— Data real dari DB</span></h2>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={fetchSpecies} style={{ padding: '0.5rem', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '0.5rem', cursor: 'pointer' }} title="Refresh"><RefreshCw size={16} color="#64748b" /></button>
-              <button onClick={() => { setShowSpeciesForm(true); setEditingSpecies(null); setSpeciesForm({ nama_umum: '', nama_ilmiah: '', status_konservasi: 'Data Deficient', habitat: '', zona_kedalaman: 'epipelagik', deskripsi: '', foto_url: '' }); }} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.625rem 1.25rem', background: '#023e8a', color: '#fff', border: 'none', borderRadius: '0.625rem', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer' }}>
+              <button onClick={() => navigate('/operator/biota/add')} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.625rem 1.25rem', background: '#023e8a', color: '#fff', border: 'none', borderRadius: '0.625rem', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer' }}>
                 <Plus size={16} /> Tambah Spesies
               </button>
             </div>
           </div>
-
-          {showSpeciesForm && (
-            <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '1rem', padding: '1.5rem', marginBottom: '1.5rem', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-              <h3 style={{ margin: '0 0 1.25rem', fontWeight: 700, color: '#0f172a' }}>{editingSpecies ? `Edit: ${editingSpecies.nama_umum}` : 'Tambah Spesies Baru'}</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div><label style={labelStyle}>Nama Umum *</label><input style={inputStyle} value={speciesForm.nama_umum} onChange={e => setSpeciesForm(p => ({ ...p, nama_umum: e.target.value }))} placeholder="mis. Penyu Hijau" /></div>
-                <div><label style={labelStyle}>Nama Ilmiah</label><input style={inputStyle} value={speciesForm.nama_ilmiah} onChange={e => setSpeciesForm(p => ({ ...p, nama_ilmiah: e.target.value }))} placeholder="mis. Chelonia mydas" /></div>
-                <div>
-                  <label style={labelStyle}>Status Konservasi (IUCN)</label>
-                  <select style={inputStyle} value={speciesForm.status_konservasi} onChange={e => setSpeciesForm(p => ({ ...p, status_konservasi: e.target.value }))}>
-                    <option>Least Concern</option>
-                    <option>Near Threatened</option>
-                    <option>Vulnerable</option>
-                    <option>Endangered</option>
-                    <option>Critically Endangered</option>
-                    <option>Data Deficient</option>
-                  </select>
-                </div>
-                <div>
-                  <label style={labelStyle}>Zona Kedalaman</label>
-                  <select style={inputStyle} value={speciesForm.zona_kedalaman} onChange={e => setSpeciesForm(p => ({ ...p, zona_kedalaman: e.target.value }))}>
-                    <option value="epipelagik">Epipelagik (0–200m)</option>
-                    <option value="mesopelagik">Mesopelagik (200–1000m)</option>
-                    <option value="batipelagik">Batipelagik (1000m+)</option>
-                    <option value="pesisir">Pesisir</option>
-                    <option value="terumbu_karang">Terumbu Karang</option>
-                  </select>
-                </div>
-                <div><label style={labelStyle}>Habitat</label><input style={inputStyle} value={speciesForm.habitat} onChange={e => setSpeciesForm(p => ({ ...p, habitat: e.target.value }))} placeholder="mis. Terumbu Karang, Padang Lamun" /></div>
-                <div><label style={labelStyle}>URL Foto</label><input style={inputStyle} value={speciesForm.foto_url} onChange={e => setSpeciesForm(p => ({ ...p, foto_url: e.target.value }))} placeholder="https://..." /></div>
-                <div style={{ gridColumn: '1 / -1' }}><label style={labelStyle}>Deskripsi</label><textarea style={{ ...inputStyle, height: 80, resize: 'vertical' }} value={speciesForm.deskripsi} onChange={e => setSpeciesForm(p => ({ ...p, deskripsi: e.target.value }))} /></div>
-              </div>
-              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.25rem' }}>
-                <button onClick={handleSaveSpecies} disabled={savingB} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.625rem 1.5rem', background: '#023e8a', color: '#fff', border: 'none', borderRadius: '0.625rem', fontWeight: 600, cursor: 'pointer', opacity: savingB ? 0.7 : 1 }}>
-                  <Save size={16} /> {savingB ? 'Menyimpan...' : 'Simpan ke DB'}
-                </button>
-                <button onClick={() => setShowSpeciesForm(false)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.625rem 1.25rem', background: '#f1f5f9', color: '#64748b', border: '1px solid #cbd5e1', borderRadius: '0.625rem', fontWeight: 600, cursor: 'pointer' }}>
-                  <X size={16} /> Batal
-                </button>
-              </div>
-            </div>
-          )}
 
           {loadingSpecies ? (
             <div style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>Memuat data biota dari database...</div>
@@ -326,13 +217,67 @@ export default function OperatorPage() {
                         <span style={{ fontSize: '0.6875rem', color: '#94a3b8', fontFamily: 'monospace' }}>{s.biota_id}</span>
                       </div>
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button onClick={() => handleEditSpecies(s)} style={{ padding: '0.25rem 0.625rem', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '0.375rem', color: '#1d4ed8', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}>Edit</button>
+                        <button onClick={() => navigate(`/operator/biota/edit/${s.biota_id}`)} style={{ padding: '0.25rem 0.625rem', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '0.375rem', color: '#1d4ed8', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}>Edit</button>
                         <button onClick={() => handleDeleteSpecies(s)} style={{ padding: '0.25rem 0.625rem', background: '#fff1f2', border: '1px solid #fecdd3', borderRadius: '0.375rem', color: '#be123c', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}>Hapus</button>
                       </div>
                     </div>
                   </div>
                 );
               })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* === OPERATOR TAB (ADMIN ONLY) === */}
+      {activeTab === 'operator' && userRole === 'admin' && (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <h2 style={{ fontSize: '1.125rem', fontWeight: 700, color: '#0f172a', margin: 0 }}>Daftar Operator Wilayah ({operators.length})</h2>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={fetchOperators} style={{ padding: '0.5rem', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '0.5rem', cursor: 'pointer' }}><RefreshCw size={16} color="#64748b" /></button>
+              <button onClick={() => navigate('/operator/accounts/add')} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.625rem 1.25rem', background: 'linear-gradient(135deg, #7c3aed, #6d28d9)', color: '#fff', border: 'none', borderRadius: '0.625rem', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer' }}>
+                <Plus size={16} /> Tambah Operator
+              </button>
+            </div>
+          </div>
+
+          {loadingOperators ? (
+            <div style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>Memuat data operator...</div>
+          ) : (
+            <div style={{ background: '#fff', borderRadius: '1rem', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                    {['Nama Operator', 'Email Akun', 'Role', 'Aksi'].map(h => (
+                      <th key={h} style={{ padding: '0.875rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {operators.map((op, i) => (
+                    <tr key={op.id} style={{ borderBottom: i < operators.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
+                      <td style={{ padding: '0.875rem 1rem', fontWeight: 600, color: '#0f172a', fontSize: '0.875rem' }}>{op.nama}</td>
+                      <td style={{ padding: '0.875rem 1rem', fontSize: '0.875rem', color: '#64748b', fontFamily: 'monospace' }}>{op.email}</td>
+                      <td style={{ padding: '0.875rem 1rem' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.25rem 0.75rem', borderRadius: 999, fontSize: '0.75rem', fontWeight: 600, background: '#faf5ff', color: '#7c3aed', border: '1px solid #e9d5ff' }}>
+                          <Shield size={12} /> {op.role}
+                        </span>
+                      </td>
+                      <td style={{ padding: '0.875rem 1rem' }}>
+                        <button onClick={() => handleDeleteOp(op)} style={{ padding: '0.375rem 0.75rem', background: '#fff1f2', border: '1px solid #fecdd3', borderRadius: '0.5rem', color: '#be123c', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.8125rem', fontWeight: 600 }}>
+                          <Trash2 size={14} /> Hapus
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {operators.length === 0 && (
+                    <tr>
+                      <td colSpan={4} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>Belum ada operator wilayah yang terdaftar.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           )}
         </div>

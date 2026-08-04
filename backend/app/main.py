@@ -5,7 +5,7 @@ Marine Conservation Monitoring Platform
 from datetime import datetime, timedelta
 from typing import Optional
 
-from fastapi import FastAPI, Depends, HTTPException, Query
+from fastapi import FastAPI, Depends, HTTPException, Query, Header
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc, and_
@@ -35,6 +35,16 @@ app.add_middleware(
 def startup():
     """Create tables and seed dummy data on startup."""
     Base.metadata.create_all(bind=engine)
+    
+    # Auto-migration: check if no_hp column exists, if not add it
+    try:
+        from sqlalchemy import text
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE users ADD COLUMN no_hp VARCHAR(50) NULL"))
+            print("  [DB] Auto-migration: Added 'no_hp' column to 'users' table")
+    except Exception as e:
+        pass # Column already exists or table doesn't exist yet
+        
     db = next(get_db())
     try:
         seed_database(db)
@@ -76,22 +86,37 @@ def startup():
 # -------------------- DASHBOARD / OVERVIEW --------------------
 
 @app.get("/api/dashboard/summary")
-def get_dashboard_summary(db: Session = Depends(get_db)):
+def get_dashboard_summary(
+    db: Session = Depends(get_db),
+    x_user_role: Optional[str] = Header(None),
+    x_user_wilayah: Optional[str] = Header(None)
+):
     """Get overview statistics for the main dashboard."""
-    sensor_count = db.query(Sensor).count()
-    online_count = db.query(Sensor).filter(Sensor.status_koneksi == "online").count()
+    sensor_q = db.query(Sensor)
+    if x_user_role == "operator" and x_user_wilayah:
+        sensor_q = sensor_q.filter(Sensor.wilayah == x_user_wilayah)
+
+    sensor_count = sensor_q.count()
+    online_count = sensor_q.filter(Sensor.status_koneksi == "online").count()
     biota_count = db.query(Biota).count()
-    active_alerts = db.query(Alert).filter(Alert.is_resolved == False).count()
+
+    alert_q = db.query(Alert).filter(Alert.is_resolved == False)
+    if x_user_role == "operator" and x_user_wilayah:
+        alert_q = alert_q.join(Sensor, Alert.sensor_id == Sensor.sensor_id).filter(Sensor.wilayah == x_user_wilayah)
+    active_alerts = alert_q.count()
 
     # Average health index from latest readings
-    subq = (
-        db.query(
-            SensorReading.sensor_id,
-            func.max(SensorReading.timestamp).label("latest")
-        )
-        .group_by(SensorReading.sensor_id)
-        .subquery()
+    sensor_ids = [s.sensor_id for s in sensor_q.all()] if (x_user_role == "operator" and x_user_wilayah) else None
+
+    subq_query = db.query(
+        SensorReading.sensor_id,
+        func.max(SensorReading.timestamp).label("latest")
     )
+    if sensor_ids is not None:
+        subq_query = subq_query.filter(SensorReading.sensor_id.in_(sensor_ids))
+        
+    subq = subq_query.group_by(SensorReading.sensor_id).subquery()
+    
     latest_readings = (
         db.query(SensorReading)
         .join(subq, and_(
@@ -100,6 +125,7 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
         ))
         .all()
     )
+    
     avg_health = 0
     if latest_readings:
         avg_health = round(
@@ -116,12 +142,20 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
     }
 
 
+
 # -------------------- SENSORS --------------------
 
 @app.get("/api/sensors")
-def get_sensors(db: Session = Depends(get_db)):
+def get_sensors(
+    db: Session = Depends(get_db),
+    x_user_role: Optional[str] = Header(None),
+    x_user_wilayah: Optional[str] = Header(None)
+):
     """Get all sensors with their latest readings."""
-    sensors = db.query(Sensor).all()
+    query = db.query(Sensor)
+    if x_user_role == "operator" and x_user_wilayah:
+        query = query.filter(Sensor.wilayah == x_user_wilayah)
+    sensors = query.all()
     result = []
     for s in sensors:
         latest = (
@@ -249,6 +283,8 @@ def create_sensor(body: dict, db: Session = Depends(get_db)):
         nama_lokasi=body.get("nama_lokasi", ""),
         lat=float(body.get("lat", 0)),
         lng=float(body.get("lng", 0)),
+        provinsi=body.get("provinsi"),
+        wilayah=body.get("wilayah"),
         kedalaman_m=float(body.get("kedalaman_m", 0)),
         zona=body.get("zona", "pemanfaatan_umum"),
         status_koneksi=body.get("status_koneksi", "online"),
@@ -292,9 +328,14 @@ def get_alerts(
     active_only: bool = Query(False),
     limit: int = Query(50, le=200),
     db: Session = Depends(get_db),
+    x_user_role: Optional[str] = Header(None),
+    x_user_wilayah: Optional[str] = Header(None)
 ):
     """Get recent alerts."""
     query = db.query(Alert)
+    if x_user_role == "operator" and x_user_wilayah:
+        query = query.join(Sensor, Alert.sensor_id == Sensor.sensor_id).filter(Sensor.wilayah == x_user_wilayah)
+        
     if active_only:
         query = query.filter(Alert.is_resolved == False)
     alerts = query.order_by(desc(Alert.created_at)).limit(limit).all()
@@ -501,9 +542,10 @@ async def chatbot_message(
     context = "\n".join(context_parts)
 
     # Try Gemini API if key is available
-    from app.config import GEMINI_API_KEY
+    from app.config import GEMINI_API_KEY, MISTRAL_API_KEY
+    import httpx
+    
     if GEMINI_API_KEY:
-        import httpx
         try:
             async with httpx.AsyncClient(timeout=30) as client:
                 resp = await client.post(
@@ -515,10 +557,37 @@ async def chatbot_message(
                         "contents": [{"parts": [{"text": f"Konteks Data Sensor Saat Ini:\n{context}\n\nPertanyaan Pengguna: {message}"}]}],
                     },
                 )
-                data = resp.json()
-                text = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
-                if text:
-                    return {"reply": text, "context_used": True}
+                if resp.status_code == 200:
+                    data = resp.json()
+                    text = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+                    if text:
+                        return {"reply": text, "context_used": True}
+        except Exception:
+            pass
+
+    # Fallback to Mistral API if Gemini fails (e.g. limit reached, error)
+    if MISTRAL_API_KEY:
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                resp = await client.post(
+                    "https://api.mistral.ai/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {MISTRAL_API_KEY}",
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "model": "mistral-small-latest",
+                        "messages": [
+                            {"role": "system", "content": "Kamu adalah OceanBot, asisten AI cerdas untuk platform OceanSmart. Tugasmu HANYA menjawab seputar laut, konservasi, kualitas air, biota laut, dan data sensor. Jika pengguna bertanya di luar topik kelautan atau platform ini, tolak dengan sangat sopan. Jawablah secara singkat, ramah, dan profesional."},
+                            {"role": "user", "content": f"Konteks Data Sensor Saat Ini:\n{context}\n\nPertanyaan Pengguna: {message}"}
+                        ]
+                    }
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    text = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+                    if text:
+                        return {"reply": text, "context_used": True}
         except Exception:
             pass
 
@@ -548,7 +617,6 @@ def register_user(body: dict, db: Session = Depends(get_db)):
     nama = body.get("nama")
     email = body.get("email")
     password = body.get("password")
-    role = body.get("role", "pengguna")
     
     if not email or not password or not nama:
         raise HTTPException(status_code=400, detail="Semua field wajib diisi")
@@ -556,22 +624,52 @@ def register_user(body: dict, db: Session = Depends(get_db)):
     existing = db.query(User).filter(User.email == email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email sudah terdaftar. Silakan masuk.")
-        
-    # Auto-detect role operator if email contains admin/operator
-    lower_email = email.lower()
-    if "admin" in lower_email or "operator" in lower_email:
-        role = "operator"
-
+    
+    # Registrasi mandiri selalu menjadi 'pengguna'
+    # Akun operator hanya dibuat oleh admin sistem melalui seeder/DB
     new_user = User(
         email=email,
         nama=nama,
         password_hash=password,
-        role=role
+        role="pengguna"
     )
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
     return {"message": "Registrasi berhasil! Silakan masuk.", "email": email}
+
+@app.put("/api/users/{user_id}/profile")
+def update_profile(user_id: int, body: dict, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User tidak ditemukan")
+    
+    if "nama" in body and body["nama"]:
+        user.nama = body["nama"]
+    if "email" in body and body["email"]:
+        existing = db.query(User).filter(User.email == body["email"], User.id != user_id).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Email sudah digunakan")
+        user.email = body["email"]
+    if "no_hp" in body:
+        user.no_hp = body["no_hp"]
+    if "password" in body and body["password"]:
+        user.password_hash = body["password"]
+    
+    db.commit()
+    db.refresh(user)
+    return {
+        "message": "Profil berhasil diperbarui", 
+        "user": {
+            "id": user.id,
+            "name": user.nama,
+            "email": user.email,
+            "role": user.role,
+            "provinsi": user.provinsi,
+            "wilayah": user.wilayah,
+            "no_hp": user.no_hp
+        }
+    }
 
 
 @app.post("/api/login")
@@ -590,11 +688,58 @@ def login_user(body: dict, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Kata sandi salah")
         
     return {
+        "id": user.id,
         "name": user.nama,
         "email": user.email,
-        "role": user.role
+        "role": user.role,
+        "provinsi": user.provinsi,
+        "wilayah": user.wilayah,
+        "no_hp": user.no_hp
     }
 
+# -------------------- OPERATOR MANAGEMENT (Admin Only) --------------------
+
+@app.get("/api/operators")
+def get_operators(db: Session = Depends(get_db)):
+    # Returns all users with role 'operator'
+    operators = db.query(User).filter(User.role == "operator").all()
+    return operators
+
+@app.post("/api/operators")
+def create_operator(body: dict, db: Session = Depends(get_db)):
+    nama = body.get("nama")
+    email = body.get("email")
+    password = body.get("password")
+    
+    if not email or not password or not nama:
+        raise HTTPException(status_code=400, detail="Semua field wajib diisi")
+    
+    existing = db.query(User).filter(User.email == email).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Email sudah terdaftar.")
+    
+    new_operator = User(
+        email=email,
+        nama=nama,
+        password_hash=password,
+        role="operator",
+        provinsi=body.get("provinsi"),
+        wilayah=body.get("wilayah")
+    )
+    db.add(new_operator)
+    db.commit()
+    db.refresh(new_operator)
+    return {"message": "Akun operator berhasil dibuat", "operator": new_operator}
+
+@app.delete("/api/operators/{user_id}")
+def delete_operator(user_id: int, db: Session = Depends(get_db)):
+    operator = db.query(User).filter(User.id == user_id, User.role == "operator").first()
+    if not operator:
+        raise HTTPException(status_code=404, detail="Operator tidak ditemukan")
+    
+    db.delete(operator)
+    db.commit()
+    return {"message": "Operator berhasil dihapus"}
 
 @app.post("/api/login/google")
 def login_google(body: dict, db: Session = Depends(get_db)):
@@ -619,7 +764,9 @@ def login_google(body: dict, db: Session = Depends(get_db)):
     return {
         "name": user.nama,
         "email": user.email,
-        "role": user.role
+        "role": user.role,
+        "provinsi": user.provinsi,
+        "wilayah": user.wilayah
     }
 
 

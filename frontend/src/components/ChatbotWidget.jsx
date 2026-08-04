@@ -9,9 +9,10 @@ export default function ChatbotWidget() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [botAnimation, setBotAnimation] = useState('Idle'); // Default animation
+  const [botAnimation, setBotAnimation] = useState('Wave'); // Default animation
   const messagesEndRef = useRef(null);
   const [hasAlerts, setHasAlerts] = useState(false);
+  const userRole = localStorage.getItem('ocean_role') || 'pengguna';
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -31,24 +32,35 @@ export default function ChatbotWidget() {
         if (alertsCount > 0) {
           setHasAlerts(true);
           setBotAnimation('HitReact');
-          setMessages([
-            {
-              role: 'bot',
-              text: `Selamat datang! Saya OceanBot, asisten virtual Anda.\n\nMohon perhatian, saat ini terdapat ${alertsCount} peringatan aktif di kawasan. Untuk informasi lebih mendetail, silakan ketik "Ada peringatan aktif?".`
-            }
-          ]);
+          
+          let greetingText = '';
+          if (userRole === 'admin') {
+            greetingText = `Halo Admin Sistem!\n\nLaporan Darurat: Terdapat ${alertsCount} peringatan kritis aktif di berbagai wilayah. Silakan ketik "Ada peringatan aktif?" untuk info lebih lanjut.`;
+          } else if (userRole === 'operator') {
+            greetingText = `Halo Operator!\n\nMohon perhatian, saat ini terdapat ${alertsCount} peringatan aktif dari sensor di wilayah Anda. Harap segera periksa!`;
+          } else {
+            greetingText = `Selamat datang! Saya OceanBot.\n\nInformasi Keamanan: Terdapat ${alertsCount} peringatan aktif di perairan saat ini. Selalu berhati-hati!`;
+          }
+          
+          setMessages([{ role: 'bot', text: greetingText }]);
         } else {
-          setBotAnimation('Idle');
-          setMessages([
-            {
-              role: 'bot',
-              text: 'Selamat datang! Saya OceanBot, asisten virtual OceanSmart.\n\nSaya dapat membantu Anda memberikan informasi mengenai:\n• Kondisi kualitas air terkini\n• Status peringatan dini\n• Informasi biota laut\n\nApa yang ingin Anda ketahui hari ini?'
-            }
-          ]);
+          setBotAnimation('Wave');
+          
+          let greetingText = '';
+          if (userRole === 'admin') {
+            greetingText = `Halo Admin!\n\nStatus sistem: Seluruh sensor berjalan normal dan tidak ada peringatan aktif.`;
+          } else if (userRole === 'operator') {
+            greetingText = `Halo Operator!\n\nKondisi wilayah Anda terpantau aman. Semua indikator sensor normal.`;
+          } else {
+            greetingText = `Selamat datang! Saya OceanBot, asisten virtual OceanSmart.\n\nKondisi perairan saat ini terpantau aman dan tidak ada bahaya.\n\nApa yang ingin Anda ketahui hari ini?`;
+          }
+          
+          setMessages([{ role: 'bot', text: greetingText }]);
         }
       })
       .catch(() => {
         // Fallback default greeting
+        setBotAnimation('Wave');
         setMessages([
           {
             role: 'bot',
@@ -70,13 +82,13 @@ export default function ChatbotWidget() {
     try {
       const res = await api.post('/chatbot', { message: userMsg });
       setMessages(prev => [...prev, { role: 'bot', text: res.data.reply }]);
-      setBotAnimation(hasAlerts ? 'HitReact' : 'Idle'); // Revert animation
+      setBotAnimation(hasAlerts ? 'HitReact' : 'Wave'); // Revert animation
     } catch {
       setMessages(prev => [...prev, {
         role: 'bot',
         text: 'Maaf, terjadi kesalahan saat memproses pesan Anda. Pastikan backend sudah berjalan.'
       }]);
-      setBotAnimation('Idle');
+      setBotAnimation('Wave');
     } finally {
       setLoading(false);
     }

@@ -12,6 +12,10 @@ import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import OperatorPage from './pages/OperatorPage';
+import SensorFormPage from './pages/SensorFormPage';
+import BiotaFormPage from './pages/BiotaFormPage';
+import OperatorAccountFormPage from './pages/OperatorAccountFormPage';
+import ProfilePage from './pages/ProfilePage';
 import ChatbotWidget from './components/ChatbotWidget';
 import './index.css';
 
@@ -28,16 +32,16 @@ const ProtectedLayout = ({ children }) => {
   );
 };
 
-// Guard khusus untuk halaman operator
+// Guard khusus untuk halaman operator dan admin
 const OperatorRoute = ({ isAuthenticated, userRole, children }) => {
   if (!isAuthenticated) return <Navigate to="/login" />;
-  if (userRole !== 'operator') return <Navigate to="/dashboard" />;
+  if (userRole !== 'operator' && userRole !== 'admin') return <Navigate to="/dashboard" />;
   return children;
 };
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [userRole, setUserRole] = useState('pengguna'); // 'pengguna' | 'operator'
+  const [userRole, setUserRole] = useState('pengguna'); // 'pengguna' | 'operator' | 'admin'
 
   const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
 
@@ -51,10 +55,12 @@ function App() {
     }
   }, []);
 
-  const handleLogin = (role = 'pengguna') => {
+  const handleLogin = (role = 'pengguna', wilayah = '', provinsi = '') => {
     setIsAuthenticated(true);
     setUserRole(role);
     localStorage.setItem('ocean_role', role);
+    if (wilayah) localStorage.setItem('ocean_wilayah', wilayah);
+    if (provinsi) localStorage.setItem('ocean_provinsi', provinsi);
   };
 
   const handleLogout = () => {
@@ -62,6 +68,8 @@ function App() {
     setUserRole('pengguna');
     localStorage.removeItem('ocean_user');
     localStorage.removeItem('ocean_role');
+    localStorage.removeItem('ocean_wilayah');
+    localStorage.removeItem('ocean_provinsi');
   };
 
   return (
@@ -87,6 +95,7 @@ function App() {
           <Route path="/monitoring/:sensorId" element={isAuthenticated ? <ProtectedLayout><MonitoringPage /></ProtectedLayout> : <Navigate to="/login" />} />
           <Route path="/biota" element={isAuthenticated ? <ProtectedLayout><BiotaPage /></ProtectedLayout> : <Navigate to="/login" />} />
           <Route path="/alerts" element={isAuthenticated ? <ProtectedLayout><AlertsPage /></ProtectedLayout> : <Navigate to="/login" />} />
+          <Route path="/profile" element={isAuthenticated ? <ProtectedLayout><ProfilePage /></ProtectedLayout> : <Navigate to="/login" />} />
 
           {/* Operator-Only Routes */}
           <Route path="/operator" element={
@@ -94,6 +103,11 @@ function App() {
               <ProtectedLayout><OperatorPage userRole={userRole} onLogout={handleLogout} /></ProtectedLayout>
             </OperatorRoute>
           } />
+          <Route path="/operator/sensors/add" element={<OperatorRoute isAuthenticated={isAuthenticated} userRole={userRole}><ProtectedLayout><SensorFormPage /></ProtectedLayout></OperatorRoute>} />
+          <Route path="/operator/sensors/edit/:sensorId" element={<OperatorRoute isAuthenticated={isAuthenticated} userRole={userRole}><ProtectedLayout><SensorFormPage /></ProtectedLayout></OperatorRoute>} />
+          <Route path="/operator/biota/add" element={<OperatorRoute isAuthenticated={isAuthenticated} userRole={userRole}><ProtectedLayout><BiotaFormPage /></ProtectedLayout></OperatorRoute>} />
+          <Route path="/operator/biota/edit/:biotaId" element={<OperatorRoute isAuthenticated={isAuthenticated} userRole={userRole}><ProtectedLayout><BiotaFormPage /></ProtectedLayout></OperatorRoute>} />
+          <Route path="/operator/accounts/add" element={<OperatorRoute isAuthenticated={isAuthenticated} userRole={userRole}><ProtectedLayout><OperatorAccountFormPage /></ProtectedLayout></OperatorRoute>} />
 
           {/* Fallback */}
           <Route path="*" element={<Navigate to={isAuthenticated ? "/dashboard" : "/"} />} />

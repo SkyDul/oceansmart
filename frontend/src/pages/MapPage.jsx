@@ -30,6 +30,26 @@ function getHealthStatus(index) {
   return 'Kritis';
 }
 
+const PROVINCES = [
+  { id: 'jabar', name: 'Jawa Barat' },
+  { id: 'jatim', name: 'Jawa Timur' },
+];
+
+const KABUPATEN_BY_PROVINCE = {
+  jabar: [
+    { id: 'all', name: 'Semua Wilayah' },
+    { id: 'pangandaran', name: 'Kab. Pangandaran' },
+    { id: 'pelabuhan_ratu', name: 'Pelabuhan Ratu' },
+    { id: 'cirebon', name: 'Cirebon' },
+  ],
+  jatim: [
+    { id: 'all', name: 'Semua Wilayah' },
+    { id: 'banyuwangi', name: 'Kab. Banyuwangi' },
+    { id: 'pacitan', name: 'Kab. Pacitan' },
+    { id: 'malang', name: 'Malang Selatan' },
+  ]
+};
+
 // Controller component to handle map flyTo animations dynamically
 function MapController({ activeSensor }) {
   const map = useMap();
@@ -56,6 +76,13 @@ export default function MapPage() {
   const [sidebarTab, setSidebarTab] = useState('sensors'); // 'sensors' | 'legend'
   const navigate = useNavigate();
 
+  const userRole = localStorage.getItem('ocean_role') || 'pengguna';
+  const userProv = localStorage.getItem('ocean_provinsi');
+  const userWilayah = localStorage.getItem('ocean_wilayah');
+  
+  const [selectedProvince, setSelectedProvince] = useState(() => (userRole === 'operator' && userProv) ? userProv : 'jabar');
+  const [selectedKabupaten, setSelectedKabupaten] = useState(() => (userRole === 'operator' && userWilayah) ? userWilayah : 'all');
+
   useEffect(() => {
     Promise.all([
       api.get('/sensors'),
@@ -81,23 +108,66 @@ export default function MapPage() {
 
   const center = [-7.7100, 108.6200]; // Centered at West Java coast (Pangandaran)
 
-  // Filter sensors based on search query
-  const filteredSensors = sensors.filter(s => 
-    s.sensor_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    s.nama_lokasi.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filter sensors based on search query and region
+  const filteredSensors = sensors.filter(s => {
+    const matchesSearch = s.sensor_id.toLowerCase().includes(searchQuery.toLowerCase()) || s.nama_lokasi.toLowerCase().includes(searchQuery.toLowerCase());
+    if (!matchesSearch) return false;
+    
+    // Region filtering
+    if (selectedKabupaten !== 'all') {
+      if ((s.wilayah || '').toLowerCase() !== selectedKabupaten.toLowerCase() && !s.nama_lokasi.toLowerCase().includes(selectedKabupaten.toLowerCase())) {
+        return false;
+      }
+    } else if (selectedProvince && s.provinsi) {
+      if (s.provinsi !== selectedProvince) return false;
+    }
+    return true;
+  });
+
+  const getProvinceName = () => PROVINCES.find(p => p.id === selectedProvince)?.name || 'Jawa Barat';
+  const getKabupatenName = () => {
+    const list = KABUPATEN_BY_PROVINCE[selectedProvince] || [];
+    const kab = list.find(k => k.id === selectedKabupaten);
+    return kab ? kab.name : selectedKabupaten;
+  };
+  const regionLabel = selectedKabupaten !== 'all' ? getKabupatenName() : getProvinceName();
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#f8fafc' }}>
       
       {/* Header Bar - Fixed Top */}
-      <header className="page-header" style={{ padding: '0.85rem 1.5rem', borderBottom: '1px solid #e2e8f0', background: '#ffffff', flexShrink: 0 }}>
+      <header className="page-header" style={{ padding: '0.85rem 1.5rem', borderBottom: '1px solid #e2e8f0', background: '#ffffff', flexShrink: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Peta Informasi Geografis (SIG)</h2>
-          <p style={{ fontSize: '0.8125rem', color: '#64748b', margin: '0.15rem 0 0' }}>Pemantauan terpadu pesisir laut Jawa Barat (Pangandaran & sekitarnya)</p>
+          <p style={{ fontSize: '0.8125rem', color: '#64748b', margin: '0.15rem 0 0' }}>Pemantauan terpadu pesisir laut {regionLabel}</p>
         </div>
         
-        {/* Layer Controls */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          {/* Dropdown Wilayah (hanya untuk Admin & Pengguna) */}
+          {userRole !== 'operator' && (
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <select 
+                className="select select-sm select-bordered" 
+                value={selectedProvince}
+                onChange={e => { setSelectedProvince(e.target.value); setSelectedKabupaten('all'); }}
+                style={{ fontSize: '0.8125rem', fontWeight: 600, borderColor: '#cbd5e1' }}
+              >
+                {PROVINCES.map(p => <option key={p.id} value={p.id}>Provinsi: {p.name}</option>)}
+              </select>
+              <select 
+                className="select select-sm select-bordered" 
+                value={selectedKabupaten}
+                onChange={e => setSelectedKabupaten(e.target.value)}
+                style={{ fontSize: '0.8125rem', fontWeight: 600, borderColor: '#cbd5e1' }}
+              >
+                {(KABUPATEN_BY_PROVINCE[selectedProvince] || []).map(k => (
+                  <option key={k.id} value={k.id}>{k.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Layer Controls */}
         <div style={{ display: 'flex', gap: '0.5rem', background: '#f1f5f9', padding: '0.25rem', borderRadius: '0.75rem', border: '1px solid #cbd5e1' }}>
           <button
             onClick={() => setShowZones(!showZones)}
@@ -139,6 +209,7 @@ export default function MapPage() {
           >
             <Info size={14} /> Indeks Kesehatan
           </button>
+        </div>
         </div>
       </header>
 

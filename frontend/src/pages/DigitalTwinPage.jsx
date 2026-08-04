@@ -91,7 +91,7 @@ function getSensorsForProvinceAndKabupaten(provinceId, kabupatenId, realSensors)
   if (provinceId === 'jabar') {
     return kabupatenId === 'all' 
       ? realSensors 
-      : realSensors.filter(s => (s.kabupaten || '').toLowerCase() === kabupatenId.toLowerCase() || s.nama_lokasi.toLowerCase().includes(kabupatenId.toLowerCase()));
+      : realSensors.filter(s => (s.wilayah || '').toLowerCase() === kabupatenId.toLowerCase() || s.nama_lokasi.toLowerCase().includes(kabupatenId.toLowerCase()));
   }
 
   const kabList = KABUPATEN_BY_PROVINCE[provinceId] || [];
@@ -184,7 +184,7 @@ const DigitalTwinModelViewer = ({ src }) => {
     <model-viewer
       ref={viewerRef}
       src={src}
-      auto-rotate
+      camera-orbit="45deg 80deg 100%"
       autoplay
       animation-name={anim}
       interaction-prompt="none"
@@ -523,14 +523,24 @@ export default function DigitalTwinPage() {
             )}
 
             {/* MAIN VISUALIZATION & DATA COLUMNS */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: '1.25rem', alignItems: 'stretch' }}>
+            {(() => {
+              const getProvinceName = () => PROVINCES.find(p => p.id === selectedProvince)?.name || 'Jawa Barat';
+              const getKabupatenName = () => {
+                const list = KABUPATEN_BY_PROVINCE[selectedProvince] || [];
+                const kab = list.find(k => k.id === selectedKabupaten);
+                return kab ? kab.name : selectedKabupaten;
+              };
+              const regionLabel = selectedSensor ? selectedSensor.nama_lokasi : (selectedKabupaten !== 'all' ? getKabupatenName() : getProvinceName());
+
+              return (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: '1.25rem', alignItems: 'stretch' }}>
               
               {/* Left Column: 2.5D Cross-Section Visualizer */}
               <div className="card" style={{ overflow: 'hidden', border: '1px solid #e2e8f0', borderRadius: '1rem', background: '#ffffff', boxShadow: '0 4px 16px rgba(0,0,0,0.02)', display: 'flex', flexDirection: 'column' }}>
                 <div className="card-header" style={{ padding: '1rem 1.25rem', borderBottom: '1px solid #f1f5f9' }}>
                   <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
                     <Layers size={18} color="#023e8a" />
-                    Cross-Section Kedalaman 3D ({selectedSensor ? selectedSensor.nama_lokasi : (selectedKabupaten !== 'all' ? selectedKabupaten : 'Jawa Barat')})
+                    Cross-Section Kedalaman 3D ({regionLabel})
                   </h3>
                   
                   {/* Playback Controls */}
@@ -548,19 +558,24 @@ export default function DigitalTwinPage() {
                 {/* Ocean Cross Section Scene */}
                 <div style={{ position: 'relative', height: 480, background: 'linear-gradient(180deg, #e0f7fa 0%, #006994 100%)', overflow: 'hidden', flex: 1 }}>
                   {/* Sky */}
-                  <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 60, background: 'linear-gradient(180deg, #87CEEB 0%, #B0E0E6 100%)', zIndex: 1 }}>
-                    <div style={{ position: 'absolute', bottom: 8, left: 20, fontSize: '0.75rem', fontWeight: 700, color: '#0369a1' }}>
-                      Permukaan Laut ({selectedSensor ? selectedSensor.nama_lokasi : 'Pesisir Jawa Barat'})
+                  <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 60, background: 'linear-gradient(180deg, #0ea5e9 0%, #38bdf8 100%)', zIndex: 1 }}>
+                    <div style={{ position: 'absolute', top: -30, right: '10%', width: 120, height: 120, background: 'radial-gradient(circle, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0) 60%)' }} />
+                    <div style={{ position: 'absolute', bottom: 12, left: 20, fontSize: '0.75rem', fontWeight: 800, color: '#ffffff', letterSpacing: 0.5, textTransform: 'uppercase', textShadow: '0 1px 3px rgba(0,0,0,0.3)' }}>
+                      Permukaan Laut ({regionLabel})
                     </div>
                   </div>
 
-                  {/* Wave SVG Animation */}
-                  <svg style={{ position: 'absolute', top: 52, left: 0, width: '200%', height: 20, zIndex: 2 }} viewBox="0 0 1440 20">
-                    <path d="M0,10 C120,0 240,20 360,10 C480,0 600,20 720,10 C840,0 960,20 1080,10 C1200,0 1320,20 1440,10" fill="none" stroke="#48cae4" strokeWidth="2.5" opacity="0.7">
-                      <animate attributeName="d" dur="3s" repeatCount="indefinite"
-                        values="M0,10 C120,0 240,20 360,10 C480,0 600,20 720,10 C840,0 960,20 1080,10 C1200,0 1320,20 1440,10;M0,10 C120,20 240,0 360,10 C480,20 600,0 720,10 C840,20 960,0 1080,10 C1200,20 1320,0 1440,10;M0,10 C120,0 240,20 360,10 C480,0 600,20 720,10 C840,0 960,20 1080,10" />
-                    </path>
-                  </svg>
+                  {/* Wave SVG Animation (Multilayer aesthetic) */}
+                  <div style={{ position: 'absolute', top: 40, left: 0, width: '100%', height: 24, zIndex: 2 }}>
+                    <svg viewBox="0 0 1440 24" style={{ width: '100%', height: '100%' }} preserveAspectRatio="none">
+                      <path fill="rgba(255,255,255,0.4)" d="M0,8 C280,-4 440,20 720,8 C1000,-4 1160,20 1440,8 L1440,24 L0,24 Z">
+                        <animate attributeName="d" dur="4s" repeatCount="indefinite" values="M0,8 C280,-4 440,20 720,8 C1000,-4 1160,20 1440,8 L1440,24 L0,24 Z; M0,8 C280,20 440,-4 720,8 C1000,20 1160,-4 1440,8 L1440,24 L0,24 Z; M0,8 C280,-4 440,20 720,8 C1000,-4 1160,20 1440,8 L1440,24 L0,24 Z"/>
+                      </path>
+                      <path fill="#e0f7fa" d="M0,14 C320,24 400,0 720,14 C1040,24 1120,0 1440,14 L1440,24 L0,24 Z">
+                        <animate attributeName="d" dur="3s" repeatCount="indefinite" values="M0,14 C320,24 400,0 720,14 C1040,24 1120,0 1440,14 L1440,24 L0,24 Z; M0,14 C320,0 400,24 720,14 C1040,0 1120,24 1440,14 L1440,24 L0,24 Z; M0,14 C320,24 400,0 720,14 C1040,24 1120,0 1440,14 L1440,24 L0,24 Z"/>
+                      </path>
+                    </svg>
+                  </div>
 
                   {/* Depth Layers */}
                   {DEPTH_LAYERS.map((layer, idx) => {
@@ -603,36 +618,32 @@ export default function DigitalTwinPage() {
                         </div>
 
                         {/* Sensor Marker Dots inside the layer */}
-                        {layerSensors.map((s, si) => {
-                          const x = 15 + ((si + 1) / (layerSensors.length + 1)) * 70;
-                          const hi = s.latest_reading?.health_index || 75;
-                          const c = getHealthColor(simMode ? Math.max(0, hi - simTemp * 8) : hi);
-                          return (
-                            <div key={s.sensor_id} style={{
-                              position: 'absolute', left: `${x}%`, top: '55%', transform: 'translate(-50%, -50%)', zIndex: 6,
-                            }}>
-                              <div style={{
-                                width: 38, height: 38, borderRadius: '50%', background: c,
-                                border: '3px solid rgba(255,255,255,0.9)', boxShadow: `0 0 14px ${c}90`,
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                fontSize: '0.6875rem', fontWeight: 800, color: '#ffffff',
+                        <div style={{
+                          position: 'absolute', left: 16, right: '55%', top: 40, bottom: 8,
+                          display: 'flex', gap: 10, flexWrap: 'wrap', alignContent: 'flex-start',
+                          overflowY: 'auto', paddingRight: 4, scrollbarWidth: 'none'
+                        }}>
+                          {layerSensors.map((s, si) => {
+                            const hi = s.latest_reading?.health_index || 75;
+                            const c = getHealthColor(simMode ? Math.max(0, hi - simTemp * 8) : hi);
+                            return (
+                              <div key={s.sensor_id} title={`Lokasi: ${s.nama_lokasi}\nID Sensor: ${s.sensor_id}\nHealth Index: ${simMode ? Math.max(0, Math.round(hi - simTemp * 8)) : Math.round(hi)}`} style={{
+                                width: 36, height: 36, borderRadius: '50%', background: c,
+                                border: '2px solid rgba(255,255,255,0.9)', boxShadow: `0 0 10px ${c}80`,
+                                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                                color: '#ffffff', cursor: 'help', flexShrink: 0
                               }}>
-                                {simMode ? Math.max(0, Math.round(hi - simTemp * 8)) : Math.round(hi)}
+                                <span style={{ fontSize: '0.45rem', fontWeight: 800, lineHeight: 1, opacity: 0.9 }}>HI</span>
+                                <span style={{ fontSize: '0.7rem', fontWeight: 800, lineHeight: 1.1 }}>{simMode ? Math.max(0, Math.round(hi - simTemp * 8)) : Math.round(hi)}</span>
                               </div>
-                              <div style={{
-                                textAlign: 'center', marginTop: 4, fontSize: '0.625rem', fontWeight: 700,
-                                color: '#ffffff', textShadow: '0 1px 4px rgba(0,0,0,0.8)', whiteSpace: 'nowrap',
-                              }}>
-                                {s.sensor_id}
-                              </div>
-                            </div>
-                          );
-                        })}
+                            );
+                          })}
+                        </div>
 
                         {/* Biota models floating */}
                         {layerBiota.map((biotaName, bi) => {
                           const modelSrc = MODEL_MAP[biotaName];
-                          const x = 68 + bi * 10;
+                          const x = 55 + ((bi + 1) / (layerBiota.length + 1)) * 40; // Restrict fish to right 55-95% area
                           const y = 12 + (bi % 2) * 32;
                           const animDelay = bi * 0.8;
                           return (
@@ -757,8 +768,9 @@ export default function DigitalTwinPage() {
                 </div>
 
               </div>
-
-            </div>
+              </div>
+              ); // End of IIFE return
+            })()}
           </>
 
       </div>

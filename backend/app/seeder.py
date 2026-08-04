@@ -24,26 +24,26 @@ THRESHOLDS = {
 
 SENSORS_DATA = [
     # Pangandaran (Pesisir Selatan Jabar)
-    {"sensor_id": "OS-SENSOR-001", "nama_lokasi": "Cagar Alam Laut Pangandaran", "lat": -7.7100, "lng": 108.6500, "kedalaman_m": 3, "zona": "inti", "kabupaten": "Pangandaran"},
-    {"sensor_id": "OS-SENSOR-002", "nama_lokasi": "Padang Lamun Karapyak Pangandaran", "lat": -7.7200, "lng": 108.6200, "kedalaman_m": 5, "zona": "pemanfaatan_terbatas", "kabupaten": "Pangandaran"},
-    {"sensor_id": "OS-SENSOR-003", "nama_lokasi": "Dermaga Batu Hiu Pangandaran", "lat": -7.6800, "lng": 108.5900, "kedalaman_m": 1, "zona": "pemanfaatan_umum", "kabupaten": "Pangandaran"},
+    {"sensor_id": "OS-SENSOR-001", "nama_lokasi": "Cagar Alam Laut Pangandaran", "lat": -7.7100, "lng": 108.6500, "kedalaman_m": 3, "zona": "inti", "provinsi": "Jawa Barat", "wilayah": "Pangandaran"},
+    {"sensor_id": "OS-SENSOR-002", "nama_lokasi": "Padang Lamun Karapyak Pangandaran", "lat": -7.7200, "lng": 108.6200, "kedalaman_m": 5, "zona": "pemanfaatan_terbatas", "provinsi": "Jawa Barat", "wilayah": "Pangandaran"},
+    {"sensor_id": "OS-SENSOR-003", "nama_lokasi": "Dermaga Batu Hiu Pangandaran", "lat": -7.6800, "lng": 108.5900, "kedalaman_m": 1, "zona": "pemanfaatan_umum", "provinsi": "Jawa Barat", "wilayah": "Pangandaran"},
     
     # Sukabumi / Pelabuhan Ratu (Pesisir Selatan Jabar)
-    {"sensor_id": "OS-SENSOR-004", "nama_lokasi": "Teluk Pelabuhan Ratu Sukabumi", "lat": -6.9800, "lng": 106.5500, "kedalaman_m": 12, "zona": "inti", "kabupaten": "Sukabumi"},
-    {"sensor_id": "OS-SENSOR-005", "nama_lokasi": "Karang Hawu Pelabuhan Ratu", "lat": -6.9500, "lng": 106.4500, "kedalaman_m": 6, "zona": "pemanfaatan_terbatas", "kabupaten": "Sukabumi"},
+    {"sensor_id": "OS-SENSOR-004", "nama_lokasi": "Teluk Pelabuhan Ratu Sukabumi", "lat": -6.9800, "lng": 106.5500, "kedalaman_m": 12, "zona": "inti", "provinsi": "Jawa Barat", "wilayah": "Sukabumi"},
+    {"sensor_id": "OS-SENSOR-005", "nama_lokasi": "Karang Hawu Pelabuhan Ratu", "lat": -6.9500, "lng": 106.4500, "kedalaman_m": 6, "zona": "pemanfaatan_terbatas", "provinsi": "Jawa Barat", "wilayah": "Sukabumi"},
 
     # Indramayu (Pantura Jabar)
-    {"sensor_id": "OS-SENSOR-006", "nama_lokasi": "Hutan Mangrove Karangsong Indramayu", "lat": -6.3300, "lng": 108.3600, "kedalaman_m": 2, "zona": "rehabilitasi", "kabupaten": "Indramayu"},
-    {"sensor_id": "OS-SENSOR-007", "nama_lokasi": "Pantai Tirta Maya Indramayu", "lat": -6.3800, "lng": 108.4200, "kedalaman_m": 4, "zona": "pemanfaatan_umum", "kabupaten": "Indramayu"},
+    {"sensor_id": "OS-SENSOR-006", "nama_lokasi": "Hutan Mangrove Karangsong Indramayu", "lat": -6.3300, "lng": 108.3600, "kedalaman_m": 2, "zona": "rehabilitasi", "provinsi": "Jawa Barat", "wilayah": "Indramayu"},
+    {"sensor_id": "OS-SENSOR-007", "nama_lokasi": "Pantai Tirta Maya Indramayu", "lat": -6.3800, "lng": 108.4200, "kedalaman_m": 4, "zona": "pemanfaatan_umum", "provinsi": "Jawa Barat", "wilayah": "Indramayu"},
 
     # Cirebon (Pantura Jabar)
-    {"sensor_id": "OS-SENSOR-008", "nama_lokasi": "Pesisir Kejawanan Cirebon", "lat": -6.7300, "lng": 108.5700, "kedalaman_m": 3, "zona": "rehabilitasi", "kabupaten": "Cirebon"},
+    {"sensor_id": "OS-SENSOR-008", "nama_lokasi": "Pesisir Kejawanan Cirebon", "lat": -6.7300, "lng": 108.5700, "kedalaman_m": 3, "zona": "rehabilitasi", "provinsi": "Jawa Barat", "wilayah": "Cirebon"},
 
     # Karawang (Pantura Jabar)
-    {"sensor_id": "OS-SENSOR-009", "nama_lokasi": "Tanjung Pakis Karawang", "lat": -5.9600, "lng": 107.1600, "kedalaman_m": 2, "zona": "pemanfaatan_terbatas", "kabupaten": "Karawang"},
+    {"sensor_id": "OS-SENSOR-009", "nama_lokasi": "Tanjung Pakis Karawang", "lat": -5.9600, "lng": 107.1600, "kedalaman_m": 2, "zona": "pemanfaatan_terbatas", "provinsi": "Jawa Barat", "wilayah": "Karawang"},
 
     # Subang (Pantura Jabar)
-    {"sensor_id": "OS-SENSOR-010", "nama_lokasi": "Pantai Pondok Bali Subang", "lat": -6.2100, "lng": 107.8200, "kedalaman_m": 3, "zona": "pemanfaatan_umum", "kabupaten": "Subang"},
+    {"sensor_id": "OS-SENSOR-010", "nama_lokasi": "Pantai Pondok Bali Subang", "lat": -6.2100, "lng": 107.8200, "kedalaman_m": 3, "zona": "pemanfaatan_umum", "provinsi": "Jawa Barat", "wilayah": "Subang"},
 ]
 
 
@@ -307,23 +307,18 @@ def check_thresholds_and_create_alert(reading: dict) -> dict | None:
 
 def seed_database(db: Session):
     """Main seeder function to populate the database with dummy data."""
-    # 0. Create default users (seeded independently of sensor data check)
-    admin_user = db.query(User).filter(User.email == "admin@oceansmart.id").first()
-    if not admin_user:
+    # 0. Create default users
+    # Akun developer/admin pertama kali dibuat di sini
+    # Pengguna umum bisa daftar mandiri lewat web
+    if not db.query(User).filter(User.email == "admin@oceansmart.id").first():
         db.add(User(
             email="admin@oceansmart.id",
-            nama="Admin OceanSmart",
-            password_hash="admin123", # Plain text for simplicity/reliability
-            role="operator"
-        ))
-        db.add(User(
-            email="user@oceansmart.id",
-            nama="Budi Santoso",
-            password_hash="user123",
-            role="pengguna"
+            nama="OceanSmart",
+            password_hash="oceansmart123",
+            role="admin"
         ))
         db.commit()
-        print("  [OK] Default users seeded (admin@oceansmart.id / admin123)")
+        print("  [OK] Akun admin dibuat: admin@oceansmart.id / oceansmart123")
 
     # Check if data already exists
     existing = db.query(Sensor).first()

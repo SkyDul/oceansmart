@@ -1,7 +1,7 @@
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Map, Activity, Fish,
-  AlertTriangle, Waves, Globe, Settings, LogOut, User
+  AlertTriangle, Waves, Globe, Settings, LogOut, User, Anchor
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import api from '../api';
@@ -16,7 +16,7 @@ const navItemsAll = [
 ];
 
 const operatorItems = [
-  { path: '/operator', label: 'Panel Operator', icon: Settings },
+  { path: '/operator', label: 'Panel Manajemen', icon: Settings },
 ];
 
 export default function Sidebar() {
@@ -28,6 +28,7 @@ export default function Sidebar() {
   const userRole = localStorage.getItem('ocean_role') || 'pengguna';
   const userName = savedUser?.name || savedUser?.given_name || 'Pengguna';
   const userPhoto = savedUser?.picture || null;
+  const [imgError, setImgError] = useState(false);
 
   useEffect(() => {
     api.get('/alerts?active_only=true&limit=100')
@@ -45,7 +46,7 @@ export default function Sidebar() {
     <aside className="sidebar">
       <div className="sidebar-brand">
         <div className="sidebar-brand-icon">
-          <Waves size={22} />
+          <Anchor size={22} />
         </div>
         <div className="sidebar-text-group">
           <h1>OceanSmart</h1>
@@ -71,8 +72,8 @@ export default function Sidebar() {
           </NavLink>
         ))}
 
-        {/* Menu khusus Operator */}
-        {userRole === 'operator' && (
+        {/* Menu khusus Manajemen (Admin & Operator) */}
+        {(userRole === 'operator' || userRole === 'admin') && (
           <>
             <div className="sidebar-section-label" style={{ marginTop: '1rem' }}>Manajemen</div>
             {operatorItems.map(item => (
@@ -80,7 +81,7 @@ export default function Sidebar() {
                 key={item.path}
                 to={item.path}
                 className={({ isActive }) =>
-                  `sidebar-link ${isActive ? 'active' : ''}`
+                  `sidebar-link ${isActive || location.pathname.startsWith(item.path + '/') ? 'active' : ''}`
                 }
               >
                 <item.icon size={20} />
@@ -93,21 +94,42 @@ export default function Sidebar() {
 
       {/* User info + Logout */}
       <div style={{ padding: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.08)', marginTop: 'auto', overflow: 'hidden' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
-          {userPhoto ? (
-            <img src={userPhoto} alt="avatar" style={{ width: 36, height: 36, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.2)', flexShrink: 0 }} />
-          ) : (
-            <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <User size={18} color="rgba(255,255,255,0.7)" />
-            </div>
-          )}
-          <div className="sidebar-text" style={{ flex: 1 }}>
-            <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{userName}</div>
-            <div style={{ fontSize: '0.6875rem', color: userRole === 'operator' ? '#48cae4' : 'rgba(255,255,255,0.5)', textTransform: 'capitalize', fontWeight: 600 }}>
-              {userRole === 'operator' ? 'Role: Operator' : 'Role: Pengguna'}
+        {userRole === 'admin' ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', padding: '0.5rem', borderRadius: '0.5rem' }}>
+            {userPhoto && !imgError ? (
+              <img src={userPhoto} alt="avatar" onError={() => setImgError(true)} style={{ width: 36, height: 36, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.2)', flexShrink: 0, objectFit: 'cover' }} />
+            ) : (
+              <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <span style={{ color: '#fff', fontSize: '0.85rem', fontWeight: 800 }}>{userName.charAt(0).toUpperCase()}</span>
+              </div>
+            )}
+            <div className="sidebar-text" style={{ flex: 1 }}>
+              <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{userName}</div>
+              <div style={{ fontSize: '0.6875rem', color: '#48cae4', textTransform: 'capitalize', fontWeight: 600 }}>
+                Role: {userRole}
+              </div>
             </div>
           </div>
-        </div>
+        ) : (
+          <Link to="/profile" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', textDecoration: 'none', cursor: 'pointer', padding: '0.5rem', borderRadius: '0.5rem', transition: 'background 0.2s' }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+          >
+            {userPhoto && !imgError ? (
+              <img src={userPhoto} alt="avatar" onError={() => setImgError(true)} style={{ width: 36, height: 36, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.2)', flexShrink: 0, objectFit: 'cover' }} />
+            ) : (
+              <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <span style={{ color: '#fff', fontSize: '0.85rem', fontWeight: 800 }}>{userName.charAt(0).toUpperCase()}</span>
+              </div>
+            )}
+            <div className="sidebar-text" style={{ flex: 1 }}>
+              <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{userName}</div>
+              <div style={{ fontSize: '0.6875rem', color: userRole === 'operator' ? '#48cae4' : 'rgba(255,255,255,0.5)', textTransform: 'capitalize', fontWeight: 600 }}>
+                Role: {userRole}
+              </div>
+            </div>
+          </Link>
+        )}
         <button
           onClick={handleLogout}
           title="Keluar"
