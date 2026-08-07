@@ -313,12 +313,12 @@ def seed_database(db: Session):
     if not db.query(User).filter(User.email == "admin@oceansmart.id").first():
         db.add(User(
             email="admin@oceansmart.id",
-            nama="OceanSmart",
-            password_hash="oceansmart123",
+            nama="oceansmart",
+            password_hash="ocean123",
             role="admin"
         ))
         db.commit()
-        print("  [OK] Akun admin dibuat: admin@oceansmart.id / oceansmart123")
+        print("  [OK] Akun admin dibuat: admin@oceansmart.id (oceansmart) / ocean123")
 
     # Check if data already exists
     existing = db.query(Sensor).first()

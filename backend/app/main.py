@@ -139,6 +139,7 @@ def get_dashboard_summary(
         "active_alerts": active_alerts,
         "avg_health_index": avg_health,
         "total_zones": db.query(ConservationZone).count(),
+        "total_readings": db.query(SensorReading).count(),
     }
 
 
@@ -678,11 +679,11 @@ def login_user(body: dict, db: Session = Depends(get_db)):
     password = body.get("password")
     
     if not email or not password:
-        raise HTTPException(status_code=400, detail="Email dan password wajib diisi")
+        raise HTTPException(status_code=400, detail="Email/Username dan password wajib diisi")
         
-    user = db.query(User).filter(User.email == email).first()
+    user = db.query(User).filter((User.email == email) | (User.nama == email)).first()
     if not user:
-        raise HTTPException(status_code=404, detail="Email tidak terdaftar. Silakan daftar terlebih dahulu.")
+        raise HTTPException(status_code=404, detail="Akun tidak terdaftar. Silakan daftar terlebih dahulu.")
         
     if user.password_hash != password:
         raise HTTPException(status_code=401, detail="Kata sandi salah")

@@ -200,9 +200,44 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="loading-container" style={{ height: '100vh' }}>
-        <div className="spinner" />
-        <span style={{ color: 'var(--on-surface-muted)', fontSize: '0.875rem' }}>Memuat data...</span>
+      <div style={{ padding: '0 0.5rem' }}>
+        <header className="page-header" style={{ marginBottom: '2rem' }}>
+          <div>
+            <div className="skeleton" style={{ width: 140, height: 28, borderRadius: '0.375rem', marginBottom: '0.5rem' }} />
+            <div className="skeleton" style={{ width: 280, height: 16, borderRadius: '0.25rem' }} />
+          </div>
+          <div className="skeleton" style={{ width: 110, height: 24, borderRadius: '0.25rem' }} />
+        </header>
+
+        <div className="page-body">
+          {/* Skeleton Filter Bar */}
+          <div className="skeleton" style={{ height: 48, borderRadius: '1.25rem', marginBottom: '1.25rem' }} />
+
+          {/* Skeleton Stats Grid */}
+          <div className="stats-grid" style={{ marginBottom: '1.25rem' }}>
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="stat-card" style={{ border: '1px solid #e2e8f0', background: '#fff', padding: '1.25rem', display: 'flex', alignItems: 'center', gap: '1rem', borderRadius: '0.75rem' }}>
+                <div className="skeleton" style={{ width: 44, height: 44, borderRadius: '50%' }} />
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                  <div className="skeleton" style={{ width: '65%', height: 12, borderRadius: '0.25rem' }} />
+                  <div className="skeleton" style={{ width: '45%', height: 24, borderRadius: '0.25rem' }} />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Skeleton Grid-2 */}
+          <div className="grid-2" style={{ marginBottom: '1.25rem' }}>
+            <div className="card" style={{ border: '1px solid #e2e8f0', background: '#fff', padding: '1.5rem', borderRadius: '0.75rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div className="skeleton" style={{ width: '50%', height: 20, borderRadius: '0.25rem' }} />
+              <div className="skeleton" style={{ width: '100%', height: 220, borderRadius: '0.5rem' }} />
+            </div>
+            <div className="card" style={{ border: '1px solid #e2e8f0', background: '#fff', padding: '1.5rem', borderRadius: '0.75rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div className="skeleton" style={{ width: '40%', height: 20, borderRadius: '0.25rem' }} />
+              <div className="skeleton" style={{ width: '100%', height: 220, borderRadius: '0.5rem' }} />
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

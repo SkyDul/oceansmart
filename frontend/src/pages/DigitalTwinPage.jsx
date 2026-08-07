@@ -291,7 +291,51 @@ export default function DigitalTwinPage() {
   };
 
   if (loading) {
-    return <div className="loading-container" style={{ height: '100vh' }}><div className="spinner" /></div>;
+    return (
+      <div style={{ background: '#f8fafc', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+        {/* Header Bar Skeleton */}
+        <header className="page-header" style={{ background: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '1rem 1.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div className="skeleton" style={{ width: 220, height: 24, borderRadius: '0.375rem', marginBottom: '0.5rem' }} />
+            <div className="skeleton" style={{ width: 340, height: 16, borderRadius: '0.25rem' }} />
+          </div>
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <div className="skeleton" style={{ width: 180, height: 32, borderRadius: '0.25rem' }} />
+            <div className="skeleton" style={{ width: 120, height: 32, borderRadius: '0.25rem' }} />
+          </div>
+        </header>
+
+        {/* Main Container Skeleton */}
+        <div style={{ padding: '1.5rem', flex: 1, display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {/* Filter Bar Skeleton */}
+          <div className="skeleton" style={{ height: 48, borderRadius: '1.25rem' }} />
+
+          {/* Visualization & Panels Grid Skeleton */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: '1.25rem' }}>
+            {/* Left Visualizer Skeleton */}
+            <div className="card" style={{ border: '1px solid #e2e8f0', background: '#fff', borderRadius: '1rem', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', height: 540, boxSizing: 'border-box' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="skeleton" style={{ width: '40%', height: 20, borderRadius: '0.25rem' }} />
+                <div className="skeleton" style={{ width: '20%', height: 20, borderRadius: '0.25rem' }} />
+              </div>
+              <div className="skeleton" style={{ flex: 1, borderRadius: '0.5rem' }} />
+            </div>
+
+            {/* Right Panel Skeleton */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <div className="card" style={{ border: '1px solid #e2e8f0', background: '#fff', borderRadius: '1rem', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', height: 250, boxSizing: 'border-box' }}>
+                <div className="skeleton" style={{ width: '60%', height: 20, borderRadius: '0.25rem' }} />
+                <div className="skeleton" style={{ width: '100%', height: 140, borderRadius: '0.5rem' }} />
+              </div>
+              <div className="card" style={{ border: '1px solid #e2e8f0', background: '#fff', borderRadius: '1rem', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', height: 265, boxSizing: 'border-box' }}>
+                <div className="skeleton" style={{ width: '50%', height: 20, borderRadius: '0.25rem' }} />
+                <div className="skeleton" style={{ width: '100%', height: 160, borderRadius: '0.5rem' }} />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

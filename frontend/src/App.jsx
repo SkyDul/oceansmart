@@ -17,6 +17,7 @@ import BiotaFormPage from './pages/BiotaFormPage';
 import OperatorAccountFormPage from './pages/OperatorAccountFormPage';
 import ProfilePage from './pages/ProfilePage';
 import ChatbotWidget from './components/ChatbotWidget';
+import TermsPage from './pages/TermsPage';
 import './index.css';
 
 // Layout pembungkus untuk halaman yang memerlukan autentikasi
@@ -86,6 +87,7 @@ function App() {
           <Route path="/register" element={
             isAuthenticated ? <Navigate to="/dashboard" /> : <RegisterPage />
           } />
+          <Route path="/terms" element={<TermsPage />} />
 
           {/* Protected Routes — semua role */}
           <Route path="/dashboard" element={isAuthenticated ? <ProtectedLayout><Dashboard userRole={userRole} onLogout={handleLogout} /></ProtectedLayout> : <Navigate to="/login" />} />

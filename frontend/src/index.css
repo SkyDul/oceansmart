@@ -898,11 +898,22 @@ button {
   animation: pulse 2s ease-in-out infinite;
 }
 
+@keyframes skeleton-loading {
+  0% { background-color: #f1f5f9; }
+  50% { background-color: #e2e8f0; }
+  100% { background-color: #f1f5f9; }
+}
+
+.skeleton {
+  animation: skeleton-loading 1.5s ease-in-out infinite;
+  background-color: #f1f5f9;
+}
+
 /* ══════════════════════ UTILS FOR LANDING/LOGIN ══════════════════════ */
 .bg-dots {
   background-color: #f8fafc;
   background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
-  background-size: 40px 40px;
+  background-size: 60px 60px;
 }
 
 .light-glass-card {
