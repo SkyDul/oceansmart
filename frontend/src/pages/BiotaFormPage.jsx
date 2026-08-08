@@ -119,7 +119,7 @@ export default function BiotaFormPage() {
   if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', color: '#94a3b8' }}>Memuat data...</div>;
 
   return (
-    <div style={{ height: '100vh', width: '100%', background: '#f8fafc', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div style={{ minHeight: '100vh', width: '100%', background: '#f8fafc', paddingBottom: '3rem' }}>
       
       {toast && (
         <div style={{
@@ -136,7 +136,7 @@ export default function BiotaFormPage() {
       )}
 
       {/* Top Bar */}
-      <div style={{ padding: '1.25rem 2rem', display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0 }}>
+      <div style={{ padding: '1.5rem 2rem', display: 'flex', alignItems: 'center', gap: 16, maxWidth: '800px', margin: '0 auto' }}>
         <button
           onClick={() => navigate('/operator')}
           style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: '#475569', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer', transition: 'color 0.2s' }}
@@ -150,107 +150,144 @@ export default function BiotaFormPage() {
       </div>
 
       {/* Main Content */}
-      <div style={{ flex: 1, display: 'flex', padding: '0 2rem 2rem', overflow: 'hidden' }}>
+      <div style={{ padding: '0 2rem', maxWidth: '1200px', margin: '0 auto', boxSizing: 'border-box' }}>
         
-        {/* Split Card */}
-        <div style={{ 
-          display: 'flex', 
-          width: '100%', 
-          maxWidth: 1400,
-          margin: '0 auto',
-          height: '100%',
-          background: '#fff', 
-          borderRadius: '1rem', 
-          border: '1px solid #e2e8f0', 
-          boxShadow: '0 10px 40px rgba(0,0,0,0.04)' 
-        }}>
+        {/* Title area matching the image */}
+        <div style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.5rem 0' }}>
+              {isEdit ? 'Edit Data Biota Laut' : 'Tambah Spesies Biota Baru'}
+            </h2>
+            <p style={{ color: '#64748b', margin: 0, fontSize: '0.875rem' }}>
+              Input data katalog spesies hayati laut yang terpantau di kawasan konservasi maritim.
+            </p>
+          </div>
+          <div style={{ width: 44, height: 44, borderRadius: '0.75rem', background: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Fish size={22} color="#0284c7" />
+          </div>
+        </div>
+
+        {/* 2-column separated cards */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: '2rem', alignItems: 'start', marginBottom: '2.5rem' }}>
           
-          {/* LEFT SIDE: Identitas */}
-          <div style={{ flex: 1, padding: '2.5rem', borderRight: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '2rem', overflow: 'hidden' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: '0.5rem' }}>
-              <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#023e8a', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', fontWeight: 800 }}>
-                1
+          {/* Card Left: Identitas */}
+          <div style={{ 
+            background: '#fff', 
+            borderRadius: '1.25rem', 
+            border: '1px solid #e2e8f0', 
+            boxShadow: '0 10px 30px rgba(15,23,42,0.03)',
+            padding: '2.5rem',
+            position: 'relative',
+            overflow: 'hidden'
+          }}>
+            {/* Faded Background Number "01" */}
+            <div style={{ position: 'absolute', right: '1.5rem', top: '0.75rem', fontSize: '6rem', fontWeight: 900, color: '#f8fafc', userSelect: 'none', zIndex: 0, lineHeight: 1 }}>01</div>
+
+            <div style={{ position: 'relative', zIndex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '2rem' }}>
+                <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Fish size={18} />
+                </div>
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: '#0f172a' }}>Identitas Biota</h3>
               </div>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: '#0f172a' }}>Identitas Biota</h2>
-            </div>
 
-            <div>
-              {label(<Fish size={16} color="#10b981" />, 'Nama Umum', true)}
-              <input style={inputCls('nama_umum')} value={form.nama_umum} onChange={e => set('nama_umum', e.target.value)} placeholder="Contoh: Penyu Hijau" />
-              {errMsg('nama_umum')}
-            </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.25rem' }}>
+                  <div>
+                    {label(<Fish size={16} color="#0284c7" />, 'Nama Umum', true)}
+                    <input style={inputCls('nama_umum')} value={form.nama_umum} onChange={e => set('nama_umum', e.target.value)} placeholder="Contoh: Penyu Hijau" />
+                    {errMsg('nama_umum')}
+                  </div>
 
-            <div>
-              {label(<FileText size={16} color="#10b981" />, 'Nama Ilmiah (Spesies)')}
-              <input style={inputCls('nama_ilmiah')} value={form.nama_ilmiah} onChange={e => set('nama_ilmiah', e.target.value)} placeholder="Contoh: Chelonia mydas" />
-            </div>
+                  <div>
+                    {label(<FileText size={16} color="#0284c7" />, 'Nama Ilmiah (Spesies)')}
+                    <input style={inputCls('nama_ilmiah')} value={form.nama_ilmiah} onChange={e => set('nama_ilmiah', e.target.value)} placeholder="Contoh: Chelonia mydas" />
+                  </div>
+                </div>
 
-            <div>
-              {label(<ImageIcon size={16} color="#10b981" />, 'URL Foto / Gambar')}
-              <input style={inputCls('foto_url')} value={form.foto_url} onChange={e => set('foto_url', e.target.value)} placeholder="/images/biota/..." />
-            </div>
+                <div>
+                  {label(<ImageIcon size={16} color="#0284c7" />, 'URL Foto / Gambar')}
+                  <input style={inputCls('foto_url')} value={form.foto_url} onChange={e => set('foto_url', e.target.value)} placeholder="Contoh: /images/biota/green_turtle.jpg" />
+                </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-              {label(<FileText size={16} color="#10b981" />, 'Deskripsi Singkat')}
-              <textarea 
-                style={{ ...inputCls('deskripsi'), flex: 1, resize: 'none', minHeight: 100 }} 
-                value={form.deskripsi} 
-                onChange={e => set('deskripsi', e.target.value)} 
-                placeholder="Penjelasan singkat mengenai biota..." 
-              />
+                <div>
+                  {label(<FileText size={16} color="#0284c7" />, 'Deskripsi Singkat')}
+                  <textarea 
+                    style={{ ...inputCls('deskripsi'), resize: 'none', minHeight: 140 }} 
+                    value={form.deskripsi} 
+                    onChange={e => set('deskripsi', e.target.value)} 
+                    placeholder="Tuliskan keterangan habitat, kebiasaan, atau keunikan spesies ini..." 
+                  />
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* RIGHT SIDE: Habitat & Konservasi */}
-          <div style={{ flex: 1, padding: '2.5rem', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: '2rem' }}>
-              <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#f59e0b', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', fontWeight: 800 }}>
-                2
+          {/* Card Right: Habitat & Konservasi */}
+          <div style={{ 
+            background: '#fff', 
+            borderRadius: '1.25rem', 
+            border: '1px solid #e2e8f0', 
+            boxShadow: '0 10px 30px rgba(15,23,42,0.03)',
+            padding: '2.5rem',
+            position: 'relative',
+            overflow: 'hidden',
+            height: '100%'
+          }}>
+            {/* Faded Background Number "02" */}
+            <div style={{ position: 'absolute', right: '1.5rem', top: '0.75rem', fontSize: '6rem', fontWeight: 900, color: '#f8fafc', userSelect: 'none', zIndex: 0, lineHeight: 1 }}>02</div>
+
+            <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '2rem' }}>
+                <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#fef3c7', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Shield size={18} />
+                </div>
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: '#0f172a' }}>Habitat & Konservasi</h3>
               </div>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: '#0f172a' }}>Habitat & Konservasi</h2>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', flex: 1 }}>
+                <div>
+                  {label(<Shield size={16} color="#d97706" />, 'Status Konservasi (IUCN)')}
+                  <select style={inputCls('status_konservasi')} value={form.status_konservasi} onChange={e => set('status_konservasi', e.target.value)}>
+                    {CONSERVATION_STATUS.map(status => (
+                      <option key={status} value={status}>{status}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.25rem' }}>
+                  <div>
+                    {label(<Map size={16} color="#d97706" />, 'Habitat Utama')}
+                    <input style={inputCls('habitat')} value={form.habitat} onChange={e => set('habitat', e.target.value)} placeholder="Contoh: Terumbu karang, padang lamun" />
+                  </div>
+
+                  <div>
+                    {label(<Map size={16} color="#d97706" />, 'Zona Kedalaman / Kolom Air')}
+                    <input style={inputCls('zona_kedalaman')} value={form.zona_kedalaman} onChange={e => set('zona_kedalaman', e.target.value)} placeholder="Contoh: 0-15m, epipelagik" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Form Actions inside Card 2 Footer */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid #f1f5f9', paddingTop: '1.5rem', marginTop: '2.5rem' }}>
+                <button type="button" onClick={() => navigate('/operator')} style={{ padding: '0.65rem 1.25rem', background: '#fff', border: '1px solid #cbd5e1', borderRadius: '0.5rem', color: '#475569', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
+                  Batal
+                </button>
+                <button
+                  onClick={handleSave} disabled={saving}
+                  style={{
+                    padding: '0.65rem 1.75rem', background: 'linear-gradient(135deg, #0ea5e9, #023e8a)', border: 'none', borderRadius: '0.5rem',
+                    color: '#fff', fontSize: '0.85rem', fontWeight: 700, cursor: saving ? 'wait' : 'pointer',
+                    display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 4px 12px rgba(2,62,138,0.15)'
+                  }}
+                >
+                  {saving ? 'Menyimpan...' : <><Save size={14} /> {isEdit ? 'Simpan' : 'Daftarkan'}</>}
+                </button>
+              </div>
+
             </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', flex: 1, overflow: 'hidden' }}>
-              
-              <div>
-                {label(<Shield size={16} color="#f59e0b" />, 'Status Konservasi (IUCN)')}
-                <select style={inputCls('status_konservasi')} value={form.status_konservasi} onChange={e => set('status_konservasi', e.target.value)}>
-                  {CONSERVATION_STATUS.map(status => (
-                    <option key={status} value={status}>{status}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                {label(<Map size={16} color="#f59e0b" />, 'Habitat Utama')}
-                <input style={inputCls('habitat')} value={form.habitat} onChange={e => set('habitat', e.target.value)} placeholder="Contoh: Terumbu karang, lamun..." />
-              </div>
-
-              <div>
-                {label(<Map size={16} color="#f59e0b" />, 'Zona Kedalaman (Pelagik)')}
-                <input style={inputCls('zona_kedalaman')} value={form.zona_kedalaman} onChange={e => set('zona_kedalaman', e.target.value)} placeholder="Contoh: epipelagik, 0-5m..." />
-              </div>
-
-            </div>
-
-            {/* Footer / Actions */}
-            <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
-              <button onClick={() => navigate('/operator')} style={{ padding: '0.625rem 1.25rem', background: 'transparent', border: 'none', color: '#0f172a', fontSize: '0.875rem', fontWeight: 700, cursor: 'pointer' }}>
-                Batal
-              </button>
-              <button
-                onClick={handleSave} disabled={saving}
-                style={{
-                  padding: '0.625rem 1.5rem', background: '#023e8a', border: 'none', borderRadius: '0.5rem',
-                  color: '#fff', fontSize: '0.875rem', fontWeight: 700, cursor: saving ? 'wait' : 'pointer',
-                  display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 4px 12px rgba(2,62,138,0.2)'
-                }}
-              >
-                {saving ? 'Menyimpan...' : <><Save size={16} /> {isEdit ? 'Simpan Perubahan' : 'Daftarkan Biota'}</>}
-              </button>
-            </div>
-            
           </div>
+
         </div>
       </div>
 

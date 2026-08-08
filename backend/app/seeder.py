@@ -44,6 +44,23 @@ SENSORS_DATA = [
 
     # Subang (Pantura Jabar)
     {"sensor_id": "OS-SENSOR-010", "nama_lokasi": "Pantai Pondok Bali Subang", "lat": -6.2100, "lng": 107.8200, "kedalaman_m": 3, "zona": "pemanfaatan_umum", "provinsi": "Jawa Barat", "wilayah": "Subang"},
+
+    # Bali
+    {"sensor_id": "OS-SENSOR-011", "nama_lokasi": "Kawasan Konservasi Nusa Penida", "lat": -8.7200, "lng": 115.5300, "kedalaman_m": 8, "zona": "inti", "provinsi": "Bali", "wilayah": "Nusa Penida"},
+    {"sensor_id": "OS-SENSOR-012", "nama_lokasi": "Pantai Sanur Bali", "lat": -8.6700, "lng": 115.2600, "kedalaman_m": 2, "zona": "pemanfaatan_umum", "provinsi": "Bali", "wilayah": "Denpasar"},
+
+    # Jawa Timur
+    {"sensor_id": "OS-SENSOR-013", "nama_lokasi": "Taman Nasional Alas Purwo", "lat": -8.7000, "lng": 114.3600, "kedalaman_m": 10, "zona": "inti", "provinsi": "Jawa Timur", "wilayah": "Banyuwangi"},
+    {"sensor_id": "OS-SENSOR-014", "nama_lokasi": "Pulau Sempu Malang", "lat": -8.4300, "lng": 112.6900, "kedalaman_m": 6, "zona": "pemanfaatan_terbatas", "provinsi": "Jawa Timur", "wilayah": "Malang"},
+
+    # Nusa Tenggara Timur (NTT)
+    {"sensor_id": "OS-SENSOR-015", "nama_lokasi": "Taman Nasional Komodo", "lat": -8.5300, "lng": 119.4500, "kedalaman_m": 15, "zona": "inti", "provinsi": "Nusa Tenggara Timur", "wilayah": "Manggarai Barat"},
+
+    # Maluku
+    {"sensor_id": "OS-SENSOR-016", "nama_lokasi": "Taman Nasional Manusela", "lat": -2.9500, "lng": 129.5800, "kedalaman_m": 12, "zona": "rehabilitasi", "provinsi": "Maluku", "wilayah": "Maluku Tengah"},
+
+    # Papua Barat Daya
+    {"sensor_id": "OS-SENSOR-017", "nama_lokasi": "Kepulauan Raja Ampat", "lat": -0.2300, "lng": 130.5200, "kedalaman_m": 20, "zona": "inti", "provinsi": "Papua Barat Daya", "wilayah": "Raja Ampat"},
 ]
 
 
@@ -62,6 +79,11 @@ BIOTA_DATA = [
     {"biota_id": "BIO-0010", "nama_umum": "Pari Manta", "nama_ilmiah": "Mobula birostris", "zona_kedalaman": "5-30m", "status_konservasi": "Vulnerable", "deskripsi": "Pari terbesar di dunia, memiliki lebar sayap hingga 7 meter. Memakan plankton di dekat permukaan.", "habitat": "Pelagis, cleaning station", "foto_url": "/images/biota/manta_ray.jpg"},
     {"biota_id": "BIO-0011", "nama_umum": "Ikan Tuna", "nama_ilmiah": "Thunnus", "zona_kedalaman": "15-30m", "status_konservasi": "Near Threatened", "deskripsi": "Ikan pelagis besar perenang cepat yang sering bermigrasi melintasi samudera.", "habitat": "Perairan laut lepas", "foto_url": "/images/biota/tuna.jpg"},
     {"biota_id": "BIO-0012", "nama_umum": "Gurita Cincin Biru", "nama_ilmiah": "Hapalochlaena lunulata", "zona_kedalaman": "0-5m", "status_konservasi": "Least Concern", "deskripsi": "Gurita berukuran kecil dengan cincin biru bercahaya saat merasa terancam, memiliki bisa yang sangat mematikan.", "habitat": "Celah karang, rubble", "foto_url": "/images/biota/blue_ring_octopus.jpg"},
+    {"biota_id": "BIO-0013", "nama_umum": "Ikan Mas", "nama_ilmiah": "Carassius auratus", "zona_kedalaman": "0-5m", "status_konservasi": "Least Concern", "deskripsi": "Ikan berwarna keemasan mencolok dengan sirip yang elegan. Mudah beradaptasi di berbagai kondisi perairan dan dikenal sebagai ikan hias populer di seluruh dunia.", "habitat": "Perairan dangkal, laguna, kolam pesisir", "foto_url": "/images/biota/goldfish.jpg"},
+    {"biota_id": "BIO-0014", "nama_umum": "Ikan Sebelah (Halibut)", "nama_ilmiah": "Hippoglossus hippoglossus", "zona_kedalaman": "15-30m", "status_konservasi": "Vulnerable", "deskripsi": "Ikan demersal berbentuk pipih lateral dengan kedua mata berada di satu sisi tubuh. Dapat tumbuh hingga 2 meter dan merupakan ikan dasar laut yang penting secara komersial.", "habitat": "Dasar laut berpasir, perairan dingin", "foto_url": "/images/biota/halibut.jpg"},
+    {"biota_id": "BIO-0015", "nama_umum": "Hiu Banteng", "nama_ilmiah": "Carcharhinus leucas", "zona_kedalaman": "0-15m", "status_konservasi": "Vulnerable", "deskripsi": "Hiu bertubuh kekar dengan moncong tumpul. Salah satu hiu paling adaptif — mampu hidup di perairan laut maupun tawar. Dikenal agresif dan sering mendekati kawasan pesisir.", "habitat": "Muara, laguna, perairan dangkal pesisir", "foto_url": "/images/biota/bull_shark.jpg"},
+    {"biota_id": "BIO-0016", "nama_umum": "Lobster Mutiara", "nama_ilmiah": "Panulirus ornatus", "zona_kedalaman": "15-30m", "status_konservasi": "Near Threatened", "deskripsi": "Lobster besar bercorak mutiara indah yang hidup di dasar karang dan celah batu. Komoditas perikanan bernilai tinggi di perairan tropis Indonesia.", "habitat": "Dasar karang, celah batu, slope dalam", "foto_url": "/images/biota/lobster.jpg"},
+    {"biota_id": "BIO-0017", "nama_umum": "Ikan Todak", "nama_ilmiah": "Xiphias gladius", "zona_kedalaman": "5-30m", "status_konservasi": "Least Concern", "deskripsi": "Ikan pelagis besar dengan moncong rahang atas yang memanjang menyerupai pedang. Perenang cepat dan predator tangguh di perairan laut terbuka tropis hingga subtropis.", "habitat": "Perairan laut lepas, zona pelagis", "foto_url": "/images/biota/swordfish.jpg"},
 ]
 
 
@@ -214,7 +236,7 @@ def update_realtime_ocean_cache():
 
 
 
-def generate_reading(base_time: datetime, sensor_data: dict, day_offset: int = 0) -> dict:
+def generate_reading(base_time: datetime, sensor_data: dict, day_offset: int = 0, anomaly_type: str = "normal") -> dict:
     """Generate a single sensor reading with realistic variations."""
     # Add time-of-day variations
     hour = base_time.hour
@@ -238,8 +260,17 @@ def generate_reading(base_time: datetime, sensor_data: dict, day_offset: int = 0
     do_val = 6.2 + (base_wave * 0.4) + day_factor * 0.3 + random.gauss(0, 0.2) - depth_factor * 0.3
     kekeruhan = 1.5 + (base_wave * 1.8) + random.gauss(0, 0.5) + (0.5 if sensor_data["zona"] == "rehabilitasi" else 0)
 
-    # ~5% chance of anomaly
-    if random.random() < 0.05:
+    # Terapkan Anomali Buatan dari Simulator jika aktif
+    if anomaly_type == "heatwave":
+        suhu += 4.0  # Kenaikan suhu ekstrem (+4 C)
+        do_val = max(2.0, do_val - 2.5)  # Oksigen terlarut turun karena panas air
+    elif anomaly_type == "acidification":
+        ph -= 1.1    # pH turun drastis menjadi sangat asam
+    elif anomaly_type == "storm":
+        salinitas -= 5.5  # Salinitas turun akibat limpasan air tawar hujan deras
+        kekeruhan += 15.0 # Kekeruhan melonjak karena pengadukan sedimen
+    # ~5% chance of random anomaly (hanya jika dalam kondisi normal)
+    elif random.random() < 0.05:
         param = random.choice(["ph", "suhu", "salinitas", "do", "kekeruhan"])
         if param == "ph":
             ph += random.choice([-0.8, 0.8])
@@ -320,10 +351,10 @@ def seed_database(db: Session):
         db.commit()
         print("  [OK] Akun admin dibuat: admin@oceansmart.id (oceansmart) / ocean123")
 
-    # Check if data already exists
-    existing = db.query(Sensor).first()
-    if existing:
-        print("Database already seeded. Skipping sensor seeding.")
+    # Skip if data already seeded
+    existing_sensors = db.query(Sensor).count()
+    if existing_sensors > 0:
+        print("[SEED] Data already exists, skipping seed.")
         return
 
     print("[SEED] Seeding OceanSmart database...")
@@ -395,3 +426,15 @@ def seed_database(db: Session):
     print(f"  [OK] {len(ZONES_DATA)} conservation zones created")
 
     print("[DONE] Database seeding complete!")
+
+
+def upsert_new_biota(db: Session):
+    """Insert any BIOTA_DATA entries that don't exist in the DB yet (safe to run every startup)."""
+    added = 0
+    for b in BIOTA_DATA:
+        if not db.query(Biota).filter(Biota.biota_id == b["biota_id"]).first():
+            db.add(Biota(**b))
+            added += 1
+    if added > 0:
+        db.commit()
+        print(f"  [OK] {added} biota baru ditambahkan ke database")

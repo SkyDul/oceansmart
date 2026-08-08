@@ -1,18 +1,41 @@
-import { useState, useRef, useEffect } from 'react';
-import { Send, X, MessageCircle } from 'lucide-react';
-import api from '../api';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { Send, X } from 'lucide-react';
+import api, { chatbotApi } from '../api';
 import '../index.css';
 import botModel from '../assets/models/bot fish.glb';
+import { useAlert } from './AlertNotifier';
+
+// Ketika file Fish by Quaternius tersedia di folder models,
+// ganti baris ini menjadi:
+// import dashboardBot from '../assets/models/Fish by Quaternius - ypEYhCImAB.glb';
+// const DASHBOARD_BOT = dashboardBot;
+// Sementara belum ada, pakai bot fish:
+const DASHBOARD_BOT = botModel;
 
 export default function ChatbotWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [botAnimation, setBotAnimation] = useState('Wave'); // Default animation
+  const [botAnimation, setBotAnimation] = useState('Wave');
+  const [availableAnims, setAvailableAnims] = useState([]);
   const messagesEndRef = useRef(null);
+  const headerModelRef = useRef(null);
   const [hasAlerts, setHasAlerts] = useState(false);
   const userRole = localStorage.getItem('ocean_role') || 'pengguna';
+  const alertTimerRef = useRef(null);
+  const periodicAlertRef = useRef(null);
+
+  // Pick best matching animation name from available list
+  const pickAnim = useCallback((intent, anims) => {
+    if (!anims || anims.length === 0) return undefined;
+    const lower = anims.map(a => ({ orig: a, low: a.toLowerCase() }));
+    const find = (...keywords) => lower.find(a => keywords.some(k => a.low.includes(k)))?.orig;
+    if (intent === 'wave') return find('wave', 'idle', 'swim', 'float') || anims[0];
+    if (intent === 'fall') return find('fall', 'hit', 'damage', 'react', 'hurt') || anims[0];
+    if (intent === 'think') return find('yes', 'nod', 'talk', 'speak', 'swim', 'idle') || anims[0];
+    return anims[0];
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -24,51 +47,94 @@ export default function ChatbotWidget() {
     }
   }, [messages, isOpen]);
 
+  const { alerts } = useAlert();
+
+  // Load persisted non-alert messages on mount
   useEffect(() => {
-    // Initial fetch to check alerts
-    api.get('/alerts?active_only=true&limit=10')
-      .then(res => {
-        const alertsCount = res.data.length;
-        if (alertsCount > 0) {
-          setHasAlerts(true);
-          setBotAnimation('HitReact');
-          
-          let greetingText = '';
-          if (userRole === 'admin') {
-            greetingText = `Halo Admin Sistem!\n\nLaporan Darurat: Terdapat ${alertsCount} peringatan kritis aktif di berbagai wilayah. Silakan ketik "Ada peringatan aktif?" untuk info lebih lanjut.`;
-          } else if (userRole === 'operator') {
-            greetingText = `Halo Operator!\n\nMohon perhatian, saat ini terdapat ${alertsCount} peringatan aktif dari sensor di wilayah Anda. Harap segera periksa!`;
-          } else {
-            greetingText = `Selamat datang! Saya OceanBot.\n\nInformasi Keamanan: Terdapat ${alertsCount} peringatan aktif di perairan saat ini. Selalu berhati-hati!`;
-          }
-          
-          setMessages([{ role: 'bot', text: greetingText }]);
-        } else {
-          setBotAnimation('Wave');
-          
-          let greetingText = '';
-          if (userRole === 'admin') {
-            greetingText = `Halo Admin!\n\nStatus sistem: Seluruh sensor berjalan normal dan tidak ada peringatan aktif.`;
-          } else if (userRole === 'operator') {
-            greetingText = `Halo Operator!\n\nKondisi wilayah Anda terpantau aman. Semua indikator sensor normal.`;
-          } else {
-            greetingText = `Selamat datang! Saya OceanBot, asisten virtual OceanSmart.\n\nKondisi perairan saat ini terpantau aman dan tidak ada bahaya.\n\nApa yang ingin Anda ketahui hari ini?`;
-          }
-          
-          setMessages([{ role: 'bot', text: greetingText }]);
-        }
-      })
-      .catch(() => {
-        // Fallback default greeting
-        setBotAnimation('Wave');
-        setMessages([
-          {
-            role: 'bot',
-            text: 'Selamat datang! Saya OceanBot, asisten virtual OceanSmart. Apa yang ingin Anda ketahui hari ini?'
-          }
-        ]);
-      });
+    const saved = localStorage.getItem('oceanbot_messages');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        // Never restore auto-notification alerts — they are ephemeral
+        setMessages(parsed.filter(m => m.type !== 'alert_notif'));
+      } catch (e) {
+        console.error(e);
+      }
+    }
   }, []);
+
+  // Save only non-ephemeral messages
+  useEffect(() => {
+    if (messages.length > 0) {
+      localStorage.setItem(
+        'oceanbot_messages',
+        JSON.stringify(messages.filter(m => m.type !== 'alert_notif'))
+      );
+    }
+  }, [messages]);
+
+  // Build alert notification text
+  const buildAlertText = useCallback((activeAlerts) => {
+    if (userRole === 'admin') {
+      return `⚠️ Laporan Darurat!\nTerdapat ${activeAlerts.length} peringatan aktif di berbagai wilayah. Segera cek halaman Alerts.`;
+    } else if (userRole === 'operator') {
+      return `⚠️ Perhatian Operator!\nAda ${activeAlerts.length} peringatan aktif dari sensor di wilayah Anda. Harap segera periksa!`;
+    }
+    return `⚠️ Informasi Peringatan\nTerdapat ${activeAlerts.length} kondisi perairan yang perlu diwaspadai saat ini.`;
+  }, [userRole]);
+
+  // Push a transient alert notification message, auto-remove after 60s
+  const pushAlertNotification = useCallback((activeAlerts) => {
+    const msgId = `alert_notif_${Date.now()}`;
+    setMessages(prev => [
+      ...prev.filter(m => m.type !== 'alert_notif'), // remove any old one first
+      { id: msgId, role: 'bot', text: buildAlertText(activeAlerts), type: 'alert_notif' }
+    ]);
+
+    // Auto-dismiss after 60 seconds
+    if (alertTimerRef.current) clearTimeout(alertTimerRef.current);
+    alertTimerRef.current = setTimeout(() => {
+      setMessages(prev => prev.filter(m => m.id !== msgId));
+    }, 60000);
+  }, [buildAlertText]);
+
+  // Monitor live alerts — set animation & periodic 1-minute notifications
+  useEffect(() => {
+    if (!alerts) return;
+
+    const activeAlerts = alerts.filter(a => !a.is_resolved);
+    setHasAlerts(activeAlerts.length > 0);
+
+    if (activeAlerts.length > 0) {
+      // Bot jatuh (Fall) saat ada peringatan
+      setBotAnimation(pickAnim('fall', availableAnims) || 'Fall');
+
+      // Push first notification immediately
+      pushAlertNotification(activeAlerts);
+
+      // Then repeat every 60 seconds while alerts are active
+      if (periodicAlertRef.current) clearInterval(periodicAlertRef.current);
+      periodicAlertRef.current = setInterval(() => {
+        pushAlertNotification(activeAlerts);
+      }, 60000);
+    } else {
+      // No active alerts — bot wave
+      setBotAnimation(pickAnim('wave', availableAnims) || 'Wave');
+      if (periodicAlertRef.current) clearInterval(periodicAlertRef.current);
+
+      // Default greeting if chat is empty
+      setMessages(prev => {
+        if (prev.filter(m => m.type !== 'alert_notif').length === 0) {
+          return [{ role: 'bot', text: 'Selamat datang! Saya OceanBot, asisten virtual OceanSmart. Kondisi perairan saat ini terpantau aman. Ada yang bisa saya bantu?' }];
+        }
+        return prev;
+      });
+    }
+
+    return () => {
+      if (periodicAlertRef.current) clearInterval(periodicAlertRef.current);
+    };
+  }, [alerts, pushAlertNotification, availableAnims, pickAnim]);
 
   const sendMessage = async () => {
     if (!input.trim() || loading) return;
@@ -77,18 +143,19 @@ export default function ChatbotWidget() {
     setInput('');
     setMessages(prev => [...prev, { role: 'user', text: userMsg }]);
     setLoading(true);
-    setBotAnimation('Yes'); // Animation when processing/user is asking
+    setBotAnimation(pickAnim('think', availableAnims) || 'Wave');
 
     try {
-      const res = await api.post('/chatbot', { message: userMsg });
-      setMessages(prev => [...prev, { role: 'bot', text: res.data.reply }]);
-      setBotAnimation(hasAlerts ? 'HitReact' : 'Wave'); // Revert animation
+      const res = await chatbotApi.post('/chatbot', { message: userMsg });
+      const reply = (res.data.reply || '').replace(/\*\*/g, '');
+      setMessages(prev => [...prev, { role: 'bot', text: reply }]);
+      setBotAnimation(hasAlerts ? (pickAnim('fall', availableAnims) || 'Fall') : (pickAnim('wave', availableAnims) || 'Wave'));
     } catch {
       setMessages(prev => [...prev, {
         role: 'bot',
         text: 'Maaf, terjadi kesalahan saat memproses pesan Anda. Pastikan backend sudah berjalan.'
       }]);
-      setBotAnimation('Wave');
+      setBotAnimation(hasAlerts ? (pickAnim('fall', availableAnims) || 'Fall') : (pickAnim('wave', availableAnims) || 'Wave'));
     } finally {
       setLoading(false);
     }
@@ -132,7 +199,7 @@ export default function ChatbotWidget() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <div style={{ width: 44, height: 44, overflow: 'visible', position: 'relative' }}>
                 <model-viewer
-                  src={botModel}
+                  src={DASHBOARD_BOT}
                   auto-rotate
                   autoplay
                   animation-name={botAnimation}
@@ -146,7 +213,12 @@ export default function ChatbotWidget() {
               <h3 style={{ margin: 0, fontSize: '1rem', color: '#fff' }}>OceanBot</h3>
             </div>
             <button
-              onClick={() => setIsOpen(false)}
+              onClick={() => {
+                setIsOpen(false);
+                setMessages([]);
+                setInput('');
+                localStorage.removeItem('oceanbot_messages');
+              }}
               style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', padding: 0 }}
             >
               <X size={20} />
@@ -155,17 +227,42 @@ export default function ChatbotWidget() {
 
           {/* Messages */}
           <div className="chat-messages" style={{ flex: 1, padding: '1rem', overflowY: 'auto' }}>
-            {messages.map((msg, i) => (
-              <div key={i} className={`chat-bubble ${msg.role}`} style={{
-                maxWidth: '85%',
-                fontSize: '0.8125rem',
-                padding: '0.5rem 0.75rem',
-                marginBottom: '0.5rem',
-                whiteSpace: 'pre-wrap'
-              }}>
-                {msg.text}
-              </div>
-            ))}
+            {messages.map((msg, i) => {
+              if (msg.type === 'alert_notif') {
+                return (
+                  <div key={msg.id || i} style={{
+                    background: 'linear-gradient(135deg, #fff1f2, #fee2e2)',
+                    border: '1px solid #fca5a5',
+                    borderRadius: '0.75rem',
+                    padding: '0.6rem 0.75rem',
+                    marginBottom: '0.5rem',
+                    fontSize: '0.8125rem',
+                    color: '#991b1b',
+                    whiteSpace: 'pre-wrap',
+                    position: 'relative',
+                    animation: 'alertPulse 2s ease-in-out infinite',
+                  }}>
+                    {msg.text}
+                    <button
+                      onClick={() => setMessages(prev => prev.filter(m => m.id !== msg.id))}
+                      style={{ position: 'absolute', top: 6, right: 8, background: 'none', border: 'none', cursor: 'pointer', color: '#b91c1c', fontSize: '0.75rem', fontWeight: 700, lineHeight: 1 }}
+                      title="Tutup"
+                    >✕</button>
+                  </div>
+                );
+              }
+              return (
+                <div key={i} className={`chat-bubble ${msg.role}`} style={{
+                  maxWidth: '85%',
+                  fontSize: '0.8125rem',
+                  padding: '0.5rem 0.75rem',
+                  marginBottom: '0.5rem',
+                  whiteSpace: 'pre-wrap'
+                }}>
+                  {msg.text}
+                </div>
+              );
+            })}
             {loading && (
               <div className="chat-bubble bot" style={{ display: 'flex', gap: 4, width: 'fit-content' }}>
                 <span className="pulse">●</span>
@@ -240,7 +337,7 @@ export default function ChatbotWidget() {
           onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
         >
           <model-viewer
-            src={botModel}
+            src={DASHBOARD_BOT}
             auto-rotate
             autoplay
             animation-name={botAnimation}
@@ -255,6 +352,13 @@ export default function ChatbotWidget() {
           )}
         </button>
       )}
+
+      <style>{`
+        @keyframes alertPulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.3); }
+          50% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+        }
+      `}</style>
     </div>
   );
 }

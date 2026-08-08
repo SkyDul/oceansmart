@@ -1,7 +1,7 @@
 import { NavLink, Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Map, Activity, Fish,
-  AlertTriangle, Waves, Globe, Settings, LogOut, User, Anchor
+  AlertTriangle, Waves, Globe, Settings, LogOut, User, Anchor, Sliders
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import api from '../api';
@@ -13,6 +13,7 @@ const navItemsAll = [
   { path: '/monitoring', label: 'Monitoring', icon: Activity },
   { path: '/biota', label: 'Biota Laut', icon: Fish },
   { path: '/alerts', label: 'Peringatan', icon: AlertTriangle, hasBadge: true },
+  { path: '/simulator', label: 'Lab Simulasi', icon: Sliders },
 ];
 
 const operatorItems = [
@@ -56,7 +57,9 @@ export default function Sidebar() {
 
       <nav className="sidebar-nav">
         <div className="sidebar-section-label">Menu Utama</div>
-        {navItemsAll.map(item => (
+        {navItemsAll
+          .filter(item => item.path !== '/simulator' || userRole === 'pengguna')
+          .map(item => (
           <NavLink
             key={item.path}
             to={item.path}

@@ -76,7 +76,7 @@ export default function OperatorAccountFormPage() {
   );
 
   return (
-    <div style={{ height: '100vh', width: '100%', background: '#f8fafc', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div style={{ minHeight: '100vh', width: '100%', background: '#f8fafc', paddingBottom: '3rem' }}>
       
       {toast && (
         <div style={{
@@ -93,7 +93,7 @@ export default function OperatorAccountFormPage() {
       )}
 
       {/* Top Bar */}
-      <div style={{ padding: '1.25rem 2rem', display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0 }}>
+      <div style={{ padding: '1.5rem 2rem', display: 'flex', alignItems: 'center', gap: 16, maxWidth: '800px', margin: '0 auto' }}>
         <button
           onClick={() => navigate('/operator')}
           style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: '#475569', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer', transition: 'color 0.2s' }}
@@ -107,137 +107,174 @@ export default function OperatorAccountFormPage() {
       </div>
 
       {/* Main Content */}
-      <div style={{ flex: 1, display: 'flex', padding: '0 2rem 2rem', overflow: 'hidden' }}>
+      <div style={{ padding: '0 2rem', maxWidth: '1200px', margin: '0 auto', boxSizing: 'border-box' }}>
         
-        {/* Split Card */}
-        <div style={{ 
-          display: 'flex', 
-          width: '100%', 
-          maxWidth: 1400,
-          margin: '0 auto',
-          height: '100%',
-          background: '#fff', 
-          borderRadius: '1rem', 
-          border: '1px solid #e2e8f0', 
-          boxShadow: '0 10px 40px rgba(0,0,0,0.04)' 
-        }}>
+        {/* Title area matching the image */}
+        <div style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.5rem 0' }}>
+              Pendaftaran Operator Baru
+            </h2>
+            <p style={{ color: '#64748b', margin: 0, fontSize: '0.875rem' }}>
+              Registrasikan akun operator baru untuk wilayah tugas konservasi tertentu.
+            </p>
+          </div>
+          <div style={{ width: 44, height: 44, borderRadius: '0.75rem', background: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Users size={22} color="#0284c7" />
+          </div>
+        </div>
+
+        {/* 2-column separated cards */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: '2rem', alignItems: 'start', marginBottom: '2.5rem' }}>
           
-          {/* LEFT SIDE: Identitas */}
-          <div style={{ flex: 1, padding: '2.5rem', borderRight: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '2rem', overflow: 'hidden' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: '0.5rem' }}>
-              <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#023e8a', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', fontWeight: 800 }}>
-                1
+          {/* Card Left: Identitas */}
+          <div style={{ 
+            background: '#fff', 
+            borderRadius: '1.25rem', 
+            border: '1px solid #e2e8f0', 
+            boxShadow: '0 10px 30px rgba(15,23,42,0.03)',
+            padding: '2.5rem',
+            position: 'relative',
+            overflow: 'hidden'
+          }}>
+            {/* Faded Background Number "01" */}
+            <div style={{ position: 'absolute', right: '1.5rem', top: '0.75rem', fontSize: '6rem', fontWeight: 900, color: '#f8fafc', userSelect: 'none', zIndex: 0, lineHeight: 1 }}>01</div>
+
+            <div style={{ position: 'relative', zIndex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '2rem' }}>
+                <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <User size={18} />
+                </div>
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: '#0f172a' }}>Identitas Operator Wilayah</h3>
               </div>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: '#0f172a' }}>Identitas Operator</h2>
-            </div>
 
-            <div>
-              {label(<User size={16} color="#10b981" />, 'Nama Lengkap Operator', true)}
-              <input style={inputCls('nama')} value={form.nama} onChange={e => set('nama', e.target.value)} placeholder="Contoh: Budi Santoso" />
-              {errMsg('nama')}
-            </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                <div>
+                  {label(<User size={16} color="#0284c7" />, 'Nama Lengkap Operator', true)}
+                  <input style={inputCls('nama')} value={form.nama} onChange={e => set('nama', e.target.value)} placeholder="Contoh: Budi Santoso" />
+                  {errMsg('nama')}
+                </div>
 
-            <div>
-              {label(<Lock size={16} color="#10b981" />, 'NIP / NIK')}
-              <input style={inputCls('nip')} value={form.nip} onChange={e => set('nip', e.target.value)} placeholder="Misal: 19850123..." />
-            </div>
+                <div>
+                  {label(<Lock size={16} color="#0284c7" />, 'NIP / NIK Operator')}
+                  <input style={inputCls('nip')} value={form.nip} onChange={e => set('nip', e.target.value)} placeholder="Masukkan NIP atau nomor identifikasi kepegawaian..." />
+                </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-              <div>
-                {label(<MapPin size={16} color="#10b981" />, 'Provinsi')}
-                <select style={inputCls('provinsi')} value={form.provinsi} onChange={e => set('provinsi', e.target.value)}>
-                  <option value="Jawa Barat">Jawa Barat</option>
-                  <option value="Jawa Tengah">Jawa Tengah</option>
-                  <option value="Jawa Timur">Jawa Timur</option>
-                  <option value="DKI Jakarta">DKI Jakarta</option>
-                  <option value="Banten">Banten</option>
-                  <option value="DI Yogyakarta">DI Yogyakarta</option>
-                  <option value="Bali">Bali</option>
-                  <option value="Lainnya">Lainnya...</option>
-                </select>
-              </div>
-              <div>
-                {label(<Users size={16} color="#10b981" />, 'Wilayah Tugas (Bisa Diketik / Dipilih)')}
-                <div style={{ position: 'relative' }}>
-                  <input 
-                    list="wilayah-options" 
-                    style={{ ...inputCls('wilayah'), paddingRight: '3.5rem' }} 
-                    value={form.wilayah} 
-                    onChange={e => set('wilayah', e.target.value)} 
-                    placeholder="Ketik atau pilih..." 
-                  />
-                  <datalist id="wilayah-options">
-                    <option value="Pangandaran" />
-                    <option value="Pelabuhan Ratu, Sukabumi" />
-                    <option value="Karangsong, Indramayu" />
-                    <option value="Kejawanan, Cirebon" />
-                    <option value="Pondok Bali, Subang" />
-                    <option value="Tanjung Pakis, Karawang" />
-                  </datalist>
-                  {form.wilayah && (
-                    <button 
-                      type="button" 
-                      onClick={() => set('wilayah', '')}
-                      style={{ position: 'absolute', right: 32, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', cursor: 'pointer', background: 'none', border: 'none', padding: 0, display: 'flex', alignItems: 'center' }}
-                    >
-                      <X size={16} />
-                    </button>
-                  )}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.25rem' }}>
+                  <div>
+                    {label(<MapPin size={16} color="#0284c7" />, 'Provinsi Tugas')}
+                    <select style={inputCls('provinsi')} value={form.provinsi} onChange={e => set('provinsi', e.target.value)}>
+                      <option value="Jawa Barat">Jawa Barat</option>
+                      <option value="Jawa Tengah">Jawa Tengah</option>
+                      <option value="Jawa Timur">Jawa Timur</option>
+                      <option value="DKI Jakarta">DKI Jakarta</option>
+                      <option value="Banten">Banten</option>
+                      <option value="DI Yogyakarta">DI Yogyakarta</option>
+                      <option value="Bali">Bali</option>
+                      <option value="Nusa Tenggara Timur">Nusa Tenggara Timur</option>
+                      <option value="Maluku">Maluku</option>
+                      <option value="Papua Barat Daya">Papua Barat Daya</option>
+                      <option value="Lainnya">Lainnya...</option>
+                    </select>
+                  </div>
+                  <div>
+                    {label(<Users size={16} color="#0284c7" />, 'Wilayah Tugas (Bisa Diketik / Dipilih)')}
+                    <div style={{ position: 'relative' }}>
+                      <input 
+                        list="wilayah-options" 
+                        style={{ ...inputCls('wilayah'), paddingRight: '3.5rem' }} 
+                        value={form.wilayah} 
+                        onChange={e => set('wilayah', e.target.value)} 
+                        placeholder="Ketik atau pilih wilayah..." 
+                      />
+                      <datalist id="wilayah-options">
+                        <option value="Pangandaran" />
+                        <option value="Sukabumi" />
+                        <option value="Indramayu" />
+                        <option value="Cirebon" />
+                        <option value="Subang" />
+                        <option value="Karawang" />
+                        <option value="Nusa Penida" />
+                        <option value="Denpasar" />
+                        <option value="Banyuwangi" />
+                        <option value="Malang" />
+                        <option value="Manggarai Barat" />
+                        <option value="Maluku Tengah" />
+                        <option value="Raja Ampat" />
+                      </datalist>
+                      {form.wilayah && (
+                        <button 
+                          type="button" 
+                          onClick={() => set('wilayah', '')}
+                          style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', cursor: 'pointer', background: 'none', border: 'none', padding: 0, display: 'flex', alignItems: 'center' }}
+                        >
+                          <X size={16} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
+          </div>
 
-            <div style={{ padding: '1.25rem', background: '#f8fafc', borderRadius: '0.75rem', border: '1px solid #e2e8f0', display: 'flex', gap: 16, marginTop: 'auto' }}>
-              <Users size={24} color="#64748b" style={{ flexShrink: 0, marginTop: 2 }} />
-              <p style={{ fontSize: '0.9375rem', color: '#475569', margin: 0, lineHeight: 1.6 }}>
-                Akun ini akan memiliki hak akses sebagai <strong>Operator Wilayah</strong>. Mereka dapat mengelola sensor dan membaca peringatan sistem di area penugasannya.
-              </p>
+          {/* Card Right: Kredensial */}
+          <div style={{ 
+            background: '#fff', 
+            borderRadius: '1.25rem', 
+            border: '1px solid #e2e8f0', 
+            boxShadow: '0 10px 30px rgba(15,23,42,0.03)',
+            padding: '2.5rem',
+            position: 'relative',
+            overflow: 'hidden',
+            height: '100%'
+          }}>
+            {/* Faded Background Number "02" */}
+            <div style={{ position: 'absolute', right: '1.5rem', top: '0.75rem', fontSize: '6rem', fontWeight: 900, color: '#f8fafc', userSelect: 'none', zIndex: 0, lineHeight: 1 }}>02</div>
+
+            <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '2rem' }}>
+                <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#fef3c7', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Lock size={18} />
+                </div>
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: '#0f172a' }}>Kredensial Akun</h3>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', flex: 1 }}>
+                <div>
+                  {label(<Mail size={16} color="#d97706" />, 'Alamat Email Akses', true)}
+                  <input style={inputCls('email')} type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="operator@oceansmart.id" />
+                  {errMsg('email')}
+                </div>
+
+                <div>
+                  {label(<Lock size={16} color="#d97706" />, 'Kata Sandi (Password)', true)}
+                  <input style={inputCls('password')} type="password" value={form.password} onChange={e => set('password', e.target.value)} placeholder="Minimal 6 karakter" />
+                  {errMsg('password')}
+                </div>
+              </div>
+
+              {/* Form Actions inside Card 2 Footer */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid #f1f5f9', paddingTop: '1.5rem', marginTop: '2.5rem' }}>
+                <button type="button" onClick={() => navigate('/operator')} style={{ padding: '0.65rem 1.25rem', background: '#fff', border: '1px solid #cbd5e1', borderRadius: '0.5rem', color: '#475569', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
+                  Batal
+                </button>
+                <button
+                  onClick={handleSave} disabled={saving}
+                  className="btn-gradient"
+                  style={{
+                    padding: '0.65rem 1.75rem', background: 'linear-gradient(135deg, #0ea5e9, #023e8a)', border: 'none', borderRadius: '0.5rem',
+                    color: '#fff', fontSize: '0.85rem', fontWeight: 700, cursor: saving ? 'wait' : 'pointer',
+                    display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 4px 12px rgba(2,62,138,0.15)'
+                  }}
+                >
+                  {saving ? 'Mendaftarkan...' : <><CheckCircle2 size={14} /> Daftarkan</>}
+                </button>
+              </div>
+
             </div>
           </div>
 
-          {/* RIGHT SIDE: Kredensial */}
-          <div style={{ flex: 1, padding: '2.5rem', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: '2rem' }}>
-              <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#f59e0b', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', fontWeight: 800 }}>
-                2
-              </div>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: '#0f172a' }}>Detail Akses & Keamanan</h2>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', flex: 1, overflow: 'hidden' }}>
-              
-              <div>
-                {label(<Mail size={16} color="#f59e0b" />, 'Alamat Email Akses', true)}
-                <input style={inputCls('email')} type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="operator@oceansmart.id" />
-                {errMsg('email')}
-              </div>
-
-              <div>
-                {label(<Lock size={16} color="#f59e0b" />, 'Kata Sandi (Password)', true)}
-                <input style={inputCls('password')} type="password" value={form.password} onChange={e => set('password', e.target.value)} placeholder="Minimal 6 karakter" />
-                {errMsg('password')}
-              </div>
-
-            </div>
-
-            {/* Footer / Actions */}
-            <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
-              <button onClick={() => navigate('/operator')} style={{ padding: '0.625rem 1.25rem', background: 'transparent', border: 'none', color: '#0f172a', fontSize: '0.875rem', fontWeight: 700, cursor: 'pointer' }}>
-                Batal
-              </button>
-              <button
-                onClick={handleSave} disabled={saving}
-                style={{
-                  padding: '0.625rem 1.5rem', background: '#023e8a', border: 'none', borderRadius: '0.5rem',
-                  color: '#fff', fontSize: '0.875rem', fontWeight: 700, cursor: saving ? 'wait' : 'pointer',
-                  display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 4px 12px rgba(2,62,138,0.2)'
-                }}
-              >
-                {saving ? 'Mendaftarkan...' : <><CheckCircle2 size={16} /> Daftarkan Operator</>}
-              </button>
-            </div>
-            
-          </div>
         </div>
       </div>
 

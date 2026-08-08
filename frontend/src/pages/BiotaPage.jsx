@@ -15,6 +15,11 @@ import modelJellyfish from '../assets/models/Jellyfish.glb';
 import modelManta from '../assets/models/Manta ray.glb';
 import modelTuna from '../assets/models/Tuna.glb';
 import modelOctopus from '../assets/models/gurita.glb';
+import modelGoldfish from '../assets/models/Goldfish.glb';
+import modelHalibut from '../assets/models/Halibut.glb';
+import modelBullShark from '../assets/models/shark.glb';
+import modelCrayfish from '../assets/models/Crayfish.glb';
+import modelSwordfish from '../assets/models/Swordfish.glb';
 
 const MODEL_MAP = {
   'Ikan Badut (Nemo)': modelNemo,
@@ -29,6 +34,11 @@ const MODEL_MAP = {
   'Pari Manta': modelManta,
   'Ikan Tuna': modelTuna,
   'Gurita Cincin Biru': modelOctopus,
+  'Ikan Mas': modelGoldfish,
+  'Ikan Sebelah (Halibut)': modelHalibut,
+  'Hiu Banteng': modelBullShark,
+  'Lobster Mutiara': modelCrayfish,
+  'Ikan Todak': modelSwordfish,
 };
 
 const BiotaModelViewer = ({ src }) => {

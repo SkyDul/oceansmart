@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Activity, Fish, AlertTriangle, Heart,
-  MapPin, TrendingUp, Globe
+  MapPin, TrendingUp, Globe, Bell
 } from 'lucide-react';
 import {
   XAxis, YAxis, CartesianGrid, Tooltip,
@@ -64,7 +64,10 @@ function getSensorsForProvinceAndKabupaten(provinceId, kabupatenId, realSensors)
   if (provinceId === 'jabar') {
     return kabupatenId === 'all' 
       ? realSensors 
-      : realSensors.filter(s => (s.kabupaten || '').toLowerCase() === kabupatenId.toLowerCase() || s.nama_lokasi.toLowerCase().includes(kabupatenId.toLowerCase()));
+      : realSensors.filter(s => 
+          (s.wilayah || '').toLowerCase() === kabupatenId.toLowerCase() ||
+          s.nama_lokasi.toLowerCase().includes(kabupatenId.toLowerCase())
+        );
   }
 
   const kabList = KABUPATEN_BY_PROVINCE[provinceId] || [];
@@ -137,9 +140,38 @@ export default function Dashboard() {
   const [sensors, setSensors] = useState([]);
   const [alerts, setAlerts] = useState([]);
   
+  const userRole = localStorage.getItem('ocean_role') || 'pengguna';
+  const userWilayah = localStorage.getItem('ocean_wilayah') || '';
+  const userProv = localStorage.getItem('ocean_provinsi') || '';
+
+  const getProvId = (provName) => {
+    if (!provName) return 'jabar';
+    const lower = provName.toLowerCase();
+    if (lower.includes('barat')) return 'jabar';
+    if (lower.includes('timur')) return 'jatim';
+    if (lower.includes('tengah')) return 'jateng';
+    if (lower.includes('dki') || lower.includes('jakarta')) return 'dki';
+    if (lower.includes('banten')) return 'banten';
+    if (lower.includes('bali')) return 'bali';
+    return 'jabar';
+  };
+
+  const getKabId = (provId, wilName) => {
+    if (!wilName) return 'all';
+    const list = KABUPATEN_BY_PROVINCE[provId] || [];
+    const found = list.find(k => k.id.toLowerCase() === wilName.toLowerCase() || wilName.toLowerCase().includes(k.id.toLowerCase()) || k.id.toLowerCase().includes(wilName.toLowerCase()));
+    return found ? found.id : wilName;
+  };
+
   // Cascading Selection State
-  const [selectedProvince, setSelectedProvince] = useState(() => localStorage.getItem('selected_province') || 'jabar');
-  const [selectedKabupaten, setSelectedKabupaten] = useState(() => localStorage.getItem('selected_kabupaten') || 'all');
+  const [selectedProvince, setSelectedProvince] = useState(() => {
+    if (userRole === 'operator') return getProvId(userProv);
+    return localStorage.getItem('selected_province') || 'jabar';
+  });
+  const [selectedKabupaten, setSelectedKabupaten] = useState(() => {
+    if (userRole === 'operator') return getKabId(getProvId(userProv), userWilayah);
+    return localStorage.getItem('selected_kabupaten') || 'all';
+  });
   const [selectedSensorId, setSelectedSensorId] = useState(() => localStorage.getItem('selected_sensor_id') || 'all');
   
   const [trendData, setTrendData] = useState([]);
@@ -163,10 +195,16 @@ export default function Dashboard() {
         .finally(() => setLoading(false));
     };
 
+    // Update provinsi header before fetching so backend receives correct value
+    if (userRole !== 'operator') {
+      const provName = PROVINCES.find(p => p.id === selectedProvince)?.name || '';
+      localStorage.setItem('ocean_provinsi', provName);
+    }
+
     fetchData();
     const interval = setInterval(fetchData, 15000);
     return () => clearInterval(interval);
-  }, []);
+  }, [selectedProvince]); // re-fetch when province changes
 
   // Save selected regions to local storage
   useEffect(() => {
@@ -315,81 +353,103 @@ export default function Dashboard() {
           {/* Control Pills Container */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, justifyContent: 'flex-end', minWidth: 0 }}>
             
+            {/* Operator Wilayah Badge */}
+            {userRole === 'operator' && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                background: '#e0f2fe',
+                border: '1px solid #bae6fd',
+                borderRadius: '2rem',
+                padding: '0.3rem 0.85rem',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                flexShrink: 0
+              }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#0369a1', whiteSpace: 'nowrap' }}>Wilayah Kerja:</span>
+                <span style={{ fontSize: '0.8125rem', fontWeight: 800, color: '#0369a1', whiteSpace: 'nowrap' }}>{userWilayah}, {userProv}</span>
+              </div>
+            )}
+
             {/* Pill 1: Provinsi */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.35rem',
-              background: '#ffffff',
-              border: '1px solid #cbd5e1',
-              borderRadius: '2rem',
-              padding: '0.3rem 0.65rem',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
-              minWidth: 0,
-              flexShrink: 1,
-              transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
-            }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap', flexShrink: 0 }}>Provinsi:</span>
-              <select
-                value={selectedProvince}
-                onChange={e => handleProvinceChange(e.target.value)}
-                style={{
-                  border: 'none',
-                  background: 'transparent',
-                  color: '#0f172a',
-                  fontWeight: 700,
-                  fontSize: '0.8125rem',
-                  cursor: 'pointer',
-                  outline: 'none',
-                  maxWidth: '130px',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden'
-                }}
-              >
-                {PROVINCES.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            </div>
+            {userRole !== 'operator' && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                background: '#ffffff',
+                border: '1px solid #cbd5e1',
+                borderRadius: '2rem',
+                padding: '0.3rem 0.65rem',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                minWidth: 0,
+                flexShrink: 1,
+                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
+              }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap', flexShrink: 0 }}>Provinsi:</span>
+                <select
+                  value={selectedProvince}
+                  onChange={e => handleProvinceChange(e.target.value)}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    color: '#0f172a',
+                    fontWeight: 700,
+                    fontSize: '0.8125rem',
+                    cursor: 'pointer',
+                    outline: 'none',
+                    maxWidth: '130px',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden'
+                  }}
+                >
+                  {PROVINCES.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* Pill 2: Daerah */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.35rem',
-              background: '#ffffff',
-              border: '1px solid #cbd5e1',
-              borderRadius: '2rem',
-              padding: '0.3rem 0.65rem',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
-              minWidth: 0,
-              flexShrink: 2,
-              transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
-            }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap', flexShrink: 0 }}>Daerah:</span>
-              <select
-                value={selectedKabupaten}
-                onChange={e => handleKabupatenChange(e.target.value)}
-                style={{
-                  border: 'none',
-                  background: 'transparent',
-                  color: '#0f172a',
-                  fontWeight: 700,
-                  fontSize: '0.8125rem',
-                  cursor: 'pointer',
-                  outline: 'none',
-                  maxWidth: '210px',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden'
-                }}
-              >
-                {(KABUPATEN_BY_PROVINCE[selectedProvince] || []).map(k => (
-                  <option key={k.id} value={k.id}>{k.name}</option>
-                ))}
-              </select>
-            </div>
+            {userRole !== 'operator' && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                background: '#ffffff',
+                border: '1px solid #cbd5e1',
+                borderRadius: '2rem',
+                padding: '0.3rem 0.65rem',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                minWidth: 0,
+                flexShrink: 2,
+                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
+              }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap', flexShrink: 0 }}>Daerah:</span>
+                <select
+                  value={selectedKabupaten}
+                  onChange={e => handleKabupatenChange(e.target.value)}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    color: '#0f172a',
+                    fontWeight: 700,
+                    fontSize: '0.8125rem',
+                    cursor: 'pointer',
+                    outline: 'none',
+                    maxWidth: '210px',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden'
+                  }}
+                >
+                  {(KABUPATEN_BY_PROVINCE[selectedProvince] || []).map(k => (
+                    <option key={k.id} value={k.id}>{k.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* Pill 3: Titik Sensor */}
             <div style={{

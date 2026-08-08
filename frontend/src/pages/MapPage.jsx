@@ -77,10 +77,18 @@ export default function MapPage() {
   const navigate = useNavigate();
 
   const userRole = localStorage.getItem('ocean_role') || 'pengguna';
-  const userProv = localStorage.getItem('ocean_provinsi');
-  const userWilayah = localStorage.getItem('ocean_wilayah');
+  const userProv = localStorage.getItem('ocean_provinsi') || '';
+  const userWilayah = localStorage.getItem('ocean_wilayah') || '';
   
-  const [selectedProvince, setSelectedProvince] = useState(() => (userRole === 'operator' && userProv) ? userProv : 'jabar');
+  const getProvId = (provName) => {
+    if (!provName) return 'jabar';
+    const lower = provName.toLowerCase();
+    if (lower.includes('barat')) return 'jabar';
+    if (lower.includes('timur')) return 'jatim';
+    return 'jabar';
+  };
+
+  const [selectedProvince, setSelectedProvince] = useState(() => (userRole === 'operator' && userProv) ? getProvId(userProv) : 'jabar');
   const [selectedKabupaten, setSelectedKabupaten] = useState(() => (userRole === 'operator' && userWilayah) ? userWilayah : 'all');
 
   useEffect(() => {
@@ -90,9 +98,15 @@ export default function MapPage() {
       api.get('/health-index'),
     ])
       .then(([senRes, zoneRes, healthRes]) => {
-        setSensors(senRes.data);
+        const fetchedSensors = senRes.data;
+        setSensors(fetchedSensors);
         setZones(zoneRes.data);
         setHealthData(healthRes.data);
+        
+        // Auto focus map to operator's first sensor on load
+        if (userRole === 'operator' && fetchedSensors.length > 0) {
+          setActiveSensor(fetchedSensors[0]);
+        }
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -130,7 +144,7 @@ export default function MapPage() {
     const kab = list.find(k => k.id === selectedKabupaten);
     return kab ? kab.name : selectedKabupaten;
   };
-  const regionLabel = selectedKabupaten !== 'all' ? getKabupatenName() : getProvinceName();
+  const regionLabel = userRole === 'operator' ? `${userWilayah}, ${userProv}` : (selectedKabupaten !== 'all' ? getKabupatenName() : getProvinceName());
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#f8fafc' }}>

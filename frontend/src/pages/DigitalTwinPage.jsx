@@ -17,6 +17,9 @@ import modelTuna from '../assets/models/Tuna.glb';
 import modelOctopus from '../assets/models/gurita.glb';
 import modelSwordfish from '../assets/models/Swordfish.glb';
 import modelCrayfish from '../assets/models/Crayfish.glb';
+import modelGoldfish from '../assets/models/Goldfish.glb';
+import modelHalibut from '../assets/models/Halibut.glb';
+import modelBullShark from '../assets/models/shark.glb';
 
 const MODEL_MAP = {
   'Ikan Badut (Nemo)': modelNemo,
@@ -33,6 +36,9 @@ const MODEL_MAP = {
   'Gurita Cincin Biru': modelOctopus,
   'Ikan Todak': modelSwordfish,
   'Lobster Mutiara': modelCrayfish,
+  'Ikan Mas': modelGoldfish,
+  'Ikan Sebelah (Halibut)': modelHalibut,
+  'Hiu Banteng': modelBullShark,
   'Hiu Paus': null,
   'Dugong': null,
 };
@@ -130,17 +136,18 @@ function getSensorsForProvinceAndKabupaten(provinceId, kabupatenId, realSensors)
 }
 
 const DEPTH_LAYERS = [
-  { id: 'surface', label: 'Permukaan', range: '0m', color: '#0284c7', bgGrad: 'linear-gradient(180deg, #e0f2fe 0%, #bae6fd 100%)' },
-  { id: 'shallow', label: 'Dangkal', range: '0-5m', color: '#0284c7', bgGrad: 'linear-gradient(180deg, #bae6fd 0%, #38bdf8 100%)' },
-  { id: 'mid', label: 'Menengah', range: '5-15m', color: '#0369a1', bgGrad: 'linear-gradient(180deg, #38bdf8 0%, #0284c7 100%)' },
-  { id: 'deep', label: 'Dalam', range: '15-30m', color: '#075985', bgGrad: 'linear-gradient(180deg, #0284c7 0%, #0c4a6e 100%)' },
+  { id: 'surface', label: 'Permukaan', range: '0m',     color: '#0ea5e9', bgGrad: 'linear-gradient(180deg, #bae6fd 0%, #7dd3fc 100%)' },
+  { id: 'shallow', label: 'Dangkal',   range: '0–5m',   color: '#0284c7', bgGrad: 'linear-gradient(180deg, #38bdf8 0%, #0284c7 100%)' },
+  { id: 'mid',     label: 'Menengah',  range: '5–15m',  color: '#0369a1', bgGrad: 'linear-gradient(180deg, #0284c7 0%, #0369a1 100%)' },
+  { id: 'deep',    label: 'Dalam',     range: '15–30m', color: '#075985', bgGrad: 'linear-gradient(180deg, #0c4a6e 0%, #082f49 100%)' },
 ];
 
+// Semua biota GLB tersebar merata ke tiap lapisan kedalaman
 const BIOTA_BY_DEPTH = {
-  'surface': ['Ubur-ubur Kotak', 'Bintang Laut Biru', 'Hiu Paus'],
-  'shallow': ['Ikan Badut (Nemo)', 'Ikan Kepe-kepe', 'Gurita Cincin Biru', 'Dugong'],
-  'mid': ['Ikan Buntal', 'Hiu Karang Sirip Hitam', 'Ikan Napoleon', 'Ikan Tuna', 'Ikan Todak'],
-  'deep': ['Kuda Laut Pygmy', 'Pari Manta', 'Lobster Mutiara'],
+  'surface': ['Ubur-ubur Kotak', 'Bintang Laut Biru', 'Ikan Mas', 'Hiu Paus'],
+  'shallow': ['Ikan Badut (Nemo)', 'Ikan Kepe-kepe', 'Penyu Hijau', 'Gurita Cincin Biru', 'Hiu Banteng'],
+  'mid':     ['Ikan Buntal', 'Hiu Karang Sirip Hitam', 'Ikan Napoleon', 'Ikan Tuna', 'Ikan Todak', 'Ikan Sebelah (Halibut)'],
+  'deep':    ['Kuda Laut Pygmy', 'Pari Manta', 'Lobster Mutiara', 'Dugong'],
 };
 
 const BIOTA_INFO = {
@@ -160,6 +167,9 @@ const BIOTA_INFO = {
   'Lobster Mutiara': { ilmiah: 'Panulirus ornatus', spesifikasi: 'Lobster besar bercorak mutiara di dasar karang.', sejarah: 'Komoditas perairan tropis Nusantara.' },
   'Hiu Paus': { ilmiah: 'Rhincodon typus', spesifikasi: 'Spesies ikan terbesar pemakan plankton yang jinak.', sejarah: 'Telah mengarungi samudra sejak era Oligosen.' },
   'Dugong': { ilmiah: 'Dugong dugon', spesifikasi: 'Mamalia laut herbivora pemakan lamun.', sejarah: 'Spesies purba pemakan vegetasi dasar laut.' },
+  'Ikan Mas': { ilmiah: 'Carassius auratus', spesifikasi: 'Tubuh keemasan mencolok, sirip elegan. Mudah beradaptasi di berbagai kondisi air.', sejarah: 'Didomestikasi di Tiongkok lebih dari 1.000 tahun lalu, kini tersebar global.' },
+  'Ikan Sebelah (Halibut)': { ilmiah: 'Hippoglossus hippoglossus', spesifikasi: 'Tubuh pipih lateral dengan kedua mata di sisi kanan. Dapat tumbuh hingga 2 meter.', sejarah: 'Ikan demersal penting secara komersial, hidup di dasar laut bersuhu dingin.' },
+  'Hiu Banteng': { ilmiah: 'Carcharhinus leucas', spesifikasi: 'Moncong tumpul, tubuh kekar. Mampu masuk ke perairan tawar dan asin.', sejarah: 'Salah satu hiu paling adaptif, dikenal agresif dan sering mendekati pesisir.' },
 };
 
 const DigitalTwinModelViewer = ({ src }) => {
@@ -375,137 +385,67 @@ export default function DigitalTwinPage() {
           padding: '0.55rem 1rem',
           boxShadow: '0 4px 20px -2px rgba(15, 23, 42, 0.05)',
           display: 'flex',
-          alignItems: 'center',
-          justify: 'space-between',
-          gap: '0.5rem',
+          flexDirection: 'column',
+          gap: 0,
           transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
         }}>
-          {/* Left Label Badge */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#0284c7', fontWeight: 800, fontSize: '0.8125rem', flexShrink: 0 }}>
-            <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <MapPin size={15} color="#0284c7" />
-            </div>
-            <span style={{ whiteSpace: 'nowrap' }}>Wilayah & Sensor</span>
-          </div>
+          {/* Pills row */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
 
-          {/* Control Pills Container */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, justifyContent: 'flex-end', minWidth: 0 }}>
+            {/* Left Label Badge */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#0284c7', fontWeight: 800, fontSize: '0.8125rem', flexShrink: 0 }}>
+              <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <MapPin size={15} color="#0284c7" />
+              </div>
+              <span style={{ whiteSpace: 'nowrap' }}>Wilayah & Sensor</span>
+            </div>
             
             {/* Pill 1: Provinsi */}
             <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.35rem',
-              background: '#ffffff',
-              border: '1px solid #cbd5e1',
-              borderRadius: '2rem',
-              padding: '0.3rem 0.65rem',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
-              minWidth: 0,
-              flexShrink: 1,
-              transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
+              display: 'flex', alignItems: 'center', gap: '0.35rem',
+              background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '2rem',
+              padding: '0.3rem 0.65rem', boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+              flexShrink: 0,
             }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap', flexShrink: 0 }}>Provinsi:</span>
+              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap' }}>Provinsi:</span>
               <select
                 value={selectedProvince}
-                onChange={e => {
-                  setSelectedProvince(e.target.value);
-                  setSelectedKabupaten('all');
-                  setSelectedSensorId('all');
-                }}
-                style={{
-                  border: 'none',
-                  background: 'transparent',
-                  color: '#0f172a',
-                  fontWeight: 700,
-                  fontSize: '0.8125rem',
-                  cursor: 'pointer',
-                  outline: 'none',
-                  maxWidth: '130px',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden'
-                }}
+                onChange={e => { setSelectedProvince(e.target.value); setSelectedKabupaten('all'); setSelectedSensorId('all'); }}
+                style={{ border: 'none', background: 'transparent', color: '#0f172a', fontWeight: 700, fontSize: '0.8125rem', cursor: 'pointer', outline: 'none', maxWidth: '130px' }}
               >
-                {PROVINCES.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
+                {PROVINCES.map(p => (<option key={p.id} value={p.id}>{p.name}</option>))}
               </select>
             </div>
 
             {/* Pill 2: Daerah */}
             <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.35rem',
-              background: '#ffffff',
-              border: '1px solid #cbd5e1',
-              borderRadius: '2rem',
-              padding: '0.3rem 0.65rem',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
-              minWidth: 0,
-              flexShrink: 2,
-              transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
+              display: 'flex', alignItems: 'center', gap: '0.35rem',
+              background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '2rem',
+              padding: '0.3rem 0.65rem', boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+              flexShrink: 0,
             }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap', flexShrink: 0 }}>Daerah:</span>
+              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap' }}>Daerah:</span>
               <select
                 value={selectedKabupaten}
-                onChange={e => {
-                  setSelectedKabupaten(e.target.value);
-                  setSelectedSensorId('all');
-                }}
-                style={{
-                  border: 'none',
-                  background: 'transparent',
-                  color: '#0f172a',
-                  fontWeight: 700,
-                  fontSize: '0.8125rem',
-                  cursor: 'pointer',
-                  outline: 'none',
-                  maxWidth: '210px',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden'
-                }}
+                onChange={e => { setSelectedKabupaten(e.target.value); setSelectedSensorId('all'); }}
+                style={{ border: 'none', background: 'transparent', color: '#0f172a', fontWeight: 700, fontSize: '0.8125rem', cursor: 'pointer', outline: 'none', maxWidth: '210px' }}
               >
-                {(KABUPATEN_BY_PROVINCE[selectedProvince] || []).map(k => (
-                  <option key={k.id} value={k.id}>{k.name}</option>
-                ))}
+                {(KABUPATEN_BY_PROVINCE[selectedProvince] || []).map(k => (<option key={k.id} value={k.id}>{k.name}</option>))}
               </select>
             </div>
 
             {/* Pill 3: Titik Sensor */}
             <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.35rem',
-              background: 'linear-gradient(135deg, #0284c7, #0369a1)',
-              border: '1px solid #0284c7',
-              borderRadius: '2rem',
-              padding: '0.3rem 0.65rem',
-              color: '#ffffff',
-              boxShadow: '0 2px 8px rgba(2, 132, 199, 0.25)',
-              minWidth: 0,
-              flexShrink: 2,
-              transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
+              display: 'flex', alignItems: 'center', gap: '0.35rem',
+              background: 'linear-gradient(135deg, #0284c7, #0369a1)', border: '1px solid #0284c7',
+              borderRadius: '2rem', padding: '0.3rem 0.65rem', color: '#ffffff',
+              boxShadow: '0 2px 8px rgba(2, 132, 199, 0.25)', flexShrink: 0,
             }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'rgba(255, 255, 255, 0.85)', whiteSpace: 'nowrap', flexShrink: 0 }}>Titik Sensor:</span>
+              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'rgba(255, 255, 255, 0.85)', whiteSpace: 'nowrap' }}>Titik Sensor:</span>
               <select
                 value={selectedSensorId}
                 onChange={e => setSelectedSensorId(e.target.value)}
-                style={{
-                  border: 'none',
-                  background: 'transparent',
-                  color: '#ffffff',
-                  fontWeight: 700,
-                  fontSize: '0.8125rem',
-                  cursor: 'pointer',
-                  outline: 'none',
-                  maxWidth: '190px',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden'
-                }}
+                style={{ border: 'none', background: 'transparent', color: '#ffffff', fontWeight: 700, fontSize: '0.8125rem', cursor: 'pointer', outline: 'none', maxWidth: '190px' }}
               >
                 <option value="all" style={{ color: '#0f172a' }}>Semua Titik ({kabupatenSensors.length} Sensor)</option>
                 {kabupatenSensors.map(s => (
@@ -515,24 +455,97 @@ export default function DigitalTwinPage() {
                 ))}
               </select>
             </div>
-
           </div>
 
-          {/* Quick telemetry bar */}
-          {selectedSensor && activeReading && (
-            <div style={{ marginTop: '0.85rem', paddingTop: '0.85rem', borderTop: '1px solid #f1f5f9', display: 'flex', gap: '1.5rem', flexWrap: 'wrap', fontSize: '0.8125rem', width: '100%' }}>
-              <div>Suhu Laut: <strong style={{ color: '#023e8a' }}>{activeReading.suhu_celsius}°C</strong></div>
-              <div>pH Air: <strong style={{ color: '#023e8a' }}>{activeReading.ph}</strong></div>
-              <div>Oksigen Terlarut (DO): <strong style={{ color: '#023e8a' }}>{activeReading.do_mg_l} mg/L</strong></div>
-              <div>Kekeruhan: <strong style={{ color: '#023e8a' }}>{activeReading.kekeruhan_ntu} NTU</strong></div>
-              <div>Kedalaman Sensor: <strong style={{ color: '#023e8a' }}>{selectedSensor.kedalaman_m} Meter</strong></div>
-            </div>
-          )}
         </div>
 
-          <>
-            {/* What-If Simulation Control Banner */}
-            {simMode && (
+        {/* What-If Simulation Control Banner */}
+        {selectedSensor && activeReading && (() => {
+          const params = [
+            {
+              label: 'Suhu Laut',
+              value: `${activeReading.suhu_celsius}°C`,
+              icon: '🌡️',
+              ok: activeReading.suhu_celsius >= 26 && activeReading.suhu_celsius <= 30,
+              range: '26–30°C',
+              color: '#f97316',
+              bg: '#fff7ed',
+              border: '#fed7aa',
+            },
+            {
+              label: 'pH Air',
+              value: `${activeReading.ph}`,
+              icon: '⚗️',
+              ok: activeReading.ph >= 7.5 && activeReading.ph <= 8.5,
+              range: '7.5–8.5',
+              color: '#8b5cf6',
+              bg: '#f5f3ff',
+              border: '#ddd6fe',
+            },
+            {
+              label: 'Oksigen Terlarut',
+              value: `${activeReading.do_mg_l} mg/L`,
+              icon: '💧',
+              ok: activeReading.do_mg_l >= 5,
+              range: '≥5 mg/L',
+              color: '#0284c7',
+              bg: '#f0f9ff',
+              border: '#bae6fd',
+            },
+            {
+              label: 'Kekeruhan',
+              value: `${activeReading.kekeruhan_ntu} NTU`,
+              icon: '🌊',
+              ok: activeReading.kekeruhan_ntu <= 10,
+              range: '0–10 NTU',
+              color: '#0891b2',
+              bg: '#ecfeff',
+              border: '#a5f3fc',
+            },
+            {
+              label: 'Kedalaman',
+              value: `${selectedSensor.kedalaman_m} m`,
+              icon: '📏',
+              ok: true,
+              range: selectedSensor.zona,
+              color: '#059669',
+              bg: '#f0fdf4',
+              border: '#a7f3d0',
+            },
+          ];
+          return (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.75rem' }}>
+              {params.map(p => (
+                <div key={p.label} style={{
+                  background: p.ok ? p.bg : '#fff1f2',
+                  border: `1px solid ${p.ok ? p.border : '#fecaca'}`,
+                  borderRadius: '0.75rem',
+                  padding: '0.5rem 0.75rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.1rem',
+                  boxShadow: `0 1px 4px -1px ${p.ok ? p.color : '#ef4444'}14`,
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.9rem' }}>{p.icon}</span>
+                    <span style={{
+                      fontSize: '0.55rem', fontWeight: 700, padding: '1px 5px',
+                      borderRadius: 999, letterSpacing: '0.04em',
+                      background: p.ok ? p.color + '18' : '#fee2e2',
+                      color: p.ok ? p.color : '#dc2626',
+                    }}>
+                      {p.ok ? 'NORMAL' : 'ALERT'}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '0.6rem', fontWeight: 600, color: '#94a3b8', lineHeight: 1 }}>{p.label}</div>
+                  <div style={{ fontSize: '1rem', fontWeight: 800, color: p.ok ? p.color : '#dc2626', lineHeight: 1.2 }}>{p.value}</div>
+                  <div style={{ fontSize: '0.55rem', color: '#94a3b8', fontWeight: 500 }}>{p.range}</div>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
+        {simMode && (
               <div className="card" style={{ border: '2px solid #0077b6', background: '#f0f9ff', padding: '1.25rem', borderRadius: '1rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '2rem', flexWrap: 'wrap' }}>
                   <div style={{ flex: 1, minWidth: 260 }}>
@@ -600,102 +613,133 @@ export default function DigitalTwinPage() {
                 </div>
 
                 {/* Ocean Cross Section Scene */}
-                <div style={{ position: 'relative', height: 480, background: 'linear-gradient(180deg, #e0f7fa 0%, #006994 100%)', overflow: 'hidden', flex: 1 }}>
-                  {/* Sky */}
-                  <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 60, background: 'linear-gradient(180deg, #0ea5e9 0%, #38bdf8 100%)', zIndex: 1 }}>
-                    <div style={{ position: 'absolute', top: -30, right: '10%', width: 120, height: 120, background: 'radial-gradient(circle, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0) 60%)' }} />
-                    <div style={{ position: 'absolute', bottom: 12, left: 20, fontSize: '0.75rem', fontWeight: 800, color: '#ffffff', letterSpacing: 0.5, textTransform: 'uppercase', textShadow: '0 1px 3px rgba(0,0,0,0.3)' }}>
-                      Permukaan Laut ({regionLabel})
+                <div style={{ position: 'relative', height: 480, background: 'linear-gradient(180deg, #0ea5e9 0%, #0369a1 30%, #075985 60%, #082f49 100%)', overflow: 'hidden', flex: 1 }}>
+
+                  {/* === SKY === */}
+                  <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 56, background: 'linear-gradient(180deg, #7dd3fc 0%, #38bdf8 100%)', zIndex: 2 }}>
+                    {/* Sun glow */}
+                    <div style={{ position: 'absolute', top: -24, right: '12%', width: 80, height: 80, background: 'radial-gradient(circle, rgba(255,255,200,0.95) 0%, rgba(255,220,100,0.4) 45%, transparent 70%)', borderRadius: '50%' }} />
+                    {/* Clouds */}
+                    <div style={{ position: 'absolute', top: 8, left: '20%', width: 60, height: 18, background: 'rgba(255,255,255,0.7)', borderRadius: 20, filter: 'blur(2px)' }} />
+                    <div style={{ position: 'absolute', top: 12, left: '22%', width: 80, height: 14, background: 'rgba(255,255,255,0.5)', borderRadius: 20, filter: 'blur(2px)' }} />
+                    <div style={{ position: 'absolute', top: 6, left: '55%', width: 50, height: 14, background: 'rgba(255,255,255,0.6)', borderRadius: 20, filter: 'blur(2px)' }} />
+                    <div style={{ position: 'absolute', bottom: 10, left: 16, fontSize: '0.6875rem', fontWeight: 800, color: '#0c4a6e', letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                      Permukaan Laut — {regionLabel}
                     </div>
                   </div>
 
-                  {/* Wave SVG Animation (Multilayer aesthetic) */}
-                  <div style={{ position: 'absolute', top: 40, left: 0, width: '100%', height: 24, zIndex: 2 }}>
-                    <svg viewBox="0 0 1440 24" style={{ width: '100%', height: '100%' }} preserveAspectRatio="none">
-                      <path fill="rgba(255,255,255,0.4)" d="M0,8 C280,-4 440,20 720,8 C1000,-4 1160,20 1440,8 L1440,24 L0,24 Z">
-                        <animate attributeName="d" dur="4s" repeatCount="indefinite" values="M0,8 C280,-4 440,20 720,8 C1000,-4 1160,20 1440,8 L1440,24 L0,24 Z; M0,8 C280,20 440,-4 720,8 C1000,20 1160,-4 1440,8 L1440,24 L0,24 Z; M0,8 C280,-4 440,20 720,8 C1000,-4 1160,20 1440,8 L1440,24 L0,24 Z"/>
+                  {/* === WATER SURFACE WAVE === */}
+                  <div style={{ position: 'absolute', top: 44, left: 0, width: '100%', height: 20, zIndex: 3 }}>
+                    <svg viewBox="0 0 1440 20" style={{ width: '100%', height: '100%' }} preserveAspectRatio="none">
+                      <path fill="rgba(255,255,255,0.55)" d="M0,6 C240,0 480,14 720,6 C960,0 1200,14 1440,6 L1440,20 L0,20 Z">
+                        <animate attributeName="d" dur="3.5s" repeatCount="indefinite"
+                          values="M0,6 C240,0 480,14 720,6 C960,0 1200,14 1440,6 L1440,20 L0,20 Z;
+                                  M0,6 C240,14 480,0 720,6 C960,14 1200,0 1440,6 L1440,20 L0,20 Z;
+                                  M0,6 C240,0 480,14 720,6 C960,0 1200,14 1440,6 L1440,20 L0,20 Z"/>
                       </path>
-                      <path fill="#e0f7fa" d="M0,14 C320,24 400,0 720,14 C1040,24 1120,0 1440,14 L1440,24 L0,24 Z">
-                        <animate attributeName="d" dur="3s" repeatCount="indefinite" values="M0,14 C320,24 400,0 720,14 C1040,24 1120,0 1440,14 L1440,24 L0,24 Z; M0,14 C320,0 400,24 720,14 C1040,0 1120,24 1440,14 L1440,24 L0,24 Z; M0,14 C320,24 400,0 720,14 C1040,24 1120,0 1440,14 L1440,24 L0,24 Z"/>
+                      <path fill="rgba(186,230,253,0.6)" d="M0,12 C360,4 720,18 1080,12 C1260,8 1380,16 1440,12 L1440,20 L0,20 Z">
+                        <animate attributeName="d" dur="2.8s" repeatCount="indefinite"
+                          values="M0,12 C360,4 720,18 1080,12 C1260,8 1380,16 1440,12 L1440,20 L0,20 Z;
+                                  M0,12 C360,18 720,4 1080,12 C1260,16 1380,8 1440,12 L1440,20 L0,20 Z;
+                                  M0,12 C360,4 720,18 1080,12 C1260,8 1380,16 1440,12 L1440,20 L0,20 Z"/>
                       </path>
                     </svg>
                   </div>
 
-                  {/* Depth Layers */}
+                  {/* === LIGHT RAYS from surface === */}
+                  <div style={{ position: 'absolute', top: 56, left: 0, right: 0, height: 200, zIndex: 1, pointerEvents: 'none' }}>
+                    {[15, 28, 42, 58, 72].map((xPct, i) => (
+                      <div key={i} style={{
+                        position: 'absolute', left: `${xPct}%`, top: 0,
+                        width: 3 + i * 2, height: 180,
+                        background: `linear-gradient(180deg, rgba(255,255,255,${0.12 - i * 0.015}) 0%, transparent 100%)`,
+                        transform: `rotate(${-8 + i * 4}deg)`,
+                        transformOrigin: 'top center',
+                        borderRadius: 4,
+                        animation: `lightRay ${2.5 + i * 0.4}s ease-in-out ${i * 0.3}s infinite alternate`,
+                      }} />
+                    ))}
+                  </div>
+
+                  {/* === DEPTH LAYERS === */}
                   {DEPTH_LAYERS.map((layer, idx) => {
-                    const top = 60 + idx * 105;
+                    const top = 56 + idx * 106;
                     const isSelected = selectedLayer === layer.id;
                     const layerSensors = sensorsByDepth[layer.id] || [];
                     const layerBiota = BIOTA_BY_DEPTH[layer.id] || [];
                     const turbOpacity = getTurbidityOpacity(simMode ? currentTurbidity + simTemp * 2 : currentTurbidity);
+                    // Each layer gets progressively darker
+                    const darkOverlay = `rgba(2,47,73,${idx * 0.12})`;
 
                     return (
                       <div key={layer.id}
                         onClick={() => setSelectedLayer(isSelected ? null : layer.id)}
                         style={{
-                          position: 'absolute', top, left: 0, right: 0, height: 105,
+                          position: 'absolute', top, left: 0, right: 0, height: 106,
                           background: layer.bgGrad,
-                          borderTop: idx > 0 ? '1px dashed rgba(255,255,255,0.35)' : 'none',
+                          borderTop: `1px solid rgba(255,255,255,${0.25 - idx * 0.04})`,
                           cursor: 'pointer',
-                          transition: 'all 0.3s',
-                          outline: isSelected ? '3px solid #ffffff' : 'none',
-                          outlineOffset: -3,
-                          zIndex: isSelected ? 10 : 3 + idx,
+                          transition: 'box-shadow 0.2s',
+                          boxShadow: isSelected ? 'inset 0 0 0 3px rgba(255,255,255,0.9)' : 'none',
+                          zIndex: isSelected ? 10 : 4 + idx,
                         }}>
-                        
-                        {/* Turbidity Layer Overlay */}
-                        <div style={{ position: 'absolute', inset: 0, background: `rgba(139,119,80,${turbOpacity * (idx + 1) * 0.15})`, pointerEvents: 'none' }} />
 
-                        {/* Layer Label Pill */}
-                        <div style={{ position: 'absolute', left: 16, top: 10, display: 'flex', alignItems: 'center', gap: 8, zIndex: 5 }}>
-                          <div style={{
-                            background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(8px)',
-                            padding: '4px 12px', borderRadius: 6, fontSize: '0.75rem', fontWeight: 700, color: '#ffffff',
-                          }}>
-                            {layer.label} ({layer.range})
+                        {/* Progressive dark overlay */}
+                        <div style={{ position: 'absolute', inset: 0, background: darkOverlay, pointerEvents: 'none' }} />
+                        {/* Turbidity */}
+                        <div style={{ position: 'absolute', inset: 0, background: `rgba(139,119,80,${turbOpacity * (idx + 1) * 0.12})`, pointerEvents: 'none' }} />
+
+                        {/* Layer Label */}
+                        <div style={{ position: 'absolute', left: 14, top: 8, display: 'flex', alignItems: 'center', gap: 6, zIndex: 6 }}>
+                          <div style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(6px)', padding: '3px 10px', borderRadius: 20, fontSize: '0.6875rem', fontWeight: 700, color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}>
+                            {layer.label} · {layer.range}
                           </div>
                           {layerSensors.length > 0 && (
-                            <div style={{ background: 'rgba(2,62,138,0.7)', padding: '3px 8px', borderRadius: 6, fontSize: '0.6875rem', fontWeight: 600, color: '#caf0f8' }}>
-                              {layerSensors.length} Stasiun Sensor
+                            <div style={{ background: 'rgba(2,62,138,0.65)', padding: '2px 7px', borderRadius: 20, fontSize: '0.625rem', fontWeight: 600, color: '#bae6fd', border: '1px solid rgba(186,230,253,0.2)' }}>
+                              {layerSensors.length} sensor
                             </div>
                           )}
                         </div>
 
-                        {/* Sensor Marker Dots inside the layer */}
-                        <div style={{
-                          position: 'absolute', left: 16, right: '55%', top: 40, bottom: 8,
-                          display: 'flex', gap: 10, flexWrap: 'wrap', alignContent: 'flex-start',
-                          overflowY: 'auto', paddingRight: 4, scrollbarWidth: 'none'
-                        }}>
-                          {layerSensors.map((s, si) => {
+                        {/* Sensor dots — left area */}
+                        <div style={{ position: 'absolute', left: 14, right: '52%', top: 34, bottom: 6, display: 'flex', gap: 8, flexWrap: 'wrap', alignContent: 'flex-start', overflowY: 'auto', scrollbarWidth: 'none' }}>
+                          {layerSensors.map((s) => {
                             const hi = s.latest_reading?.health_index || 75;
                             const c = getHealthColor(simMode ? Math.max(0, hi - simTemp * 8) : hi);
                             return (
-                              <div key={s.sensor_id} title={`Lokasi: ${s.nama_lokasi}\nID Sensor: ${s.sensor_id}\nHealth Index: ${simMode ? Math.max(0, Math.round(hi - simTemp * 8)) : Math.round(hi)}`} style={{
-                                width: 36, height: 36, borderRadius: '50%', background: c,
-                                border: '2px solid rgba(255,255,255,0.9)', boxShadow: `0 0 10px ${c}80`,
-                                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                                color: '#ffffff', cursor: 'help', flexShrink: 0
-                              }}>
-                                <span style={{ fontSize: '0.45rem', fontWeight: 800, lineHeight: 1, opacity: 0.9 }}>HI</span>
-                                <span style={{ fontSize: '0.7rem', fontWeight: 800, lineHeight: 1.1 }}>{simMode ? Math.max(0, Math.round(hi - simTemp * 8)) : Math.round(hi)}</span>
+                              <div key={s.sensor_id}
+                                title={`${s.nama_lokasi}\n${s.sensor_id}\nHI: ${simMode ? Math.max(0, Math.round(hi - simTemp * 8)) : Math.round(hi)}`}
+                                style={{ width: 34, height: 34, borderRadius: '50%', background: c, border: '2px solid rgba(255,255,255,0.9)', boxShadow: `0 0 12px ${c}90`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#fff', cursor: 'help', flexShrink: 0 }}>
+                                <span style={{ fontSize: '0.4rem', fontWeight: 800, lineHeight: 1 }}>HI</span>
+                                <span style={{ fontSize: '0.65rem', fontWeight: 800 }}>{simMode ? Math.max(0, Math.round(hi - simTemp * 8)) : Math.round(hi)}</span>
                               </div>
                             );
                           })}
                         </div>
 
-                        {/* Biota models floating */}
+                        {/* === BIOTA 3D MODELS — right area === */}
                         {layerBiota.map((biotaName, bi) => {
                           const modelSrc = MODEL_MAP[biotaName];
-                          const x = 55 + ((bi + 1) / (layerBiota.length + 1)) * 40; // Restrict fish to right 55-95% area
-                          const y = 12 + (bi % 2) * 32;
-                          const animDelay = bi * 0.8;
+                          // Spread evenly across right 50-96% of layer
+                          const totalBiota = layerBiota.length;
+                          const xPct = 50 + ((bi + 0.5) / totalBiota) * 46;
+                          // Alternate vertical positions for natural look
+                          const yPos = bi % 3 === 0 ? 4 : bi % 3 === 1 ? 22 : 38;
+                          const size = modelSrc ? 72 : 40;
+                          const floatDur = 2.5 + (bi % 4) * 0.7;
+                          const floatDelay = bi * 0.5;
                           return (
-                            <div key={bi} style={{
-                              position: 'absolute', left: `${x}%`, top: y, width: 64, height: 64,
-                              opacity: 0.9, zIndex: 5, pointerEvents: 'auto', cursor: 'pointer',
-                              animation: `float ${3 + bi}s ease-in-out ${animDelay}s infinite alternate`,
-                            }} 
+                            <div key={biotaName} style={{
+                              position: 'absolute',
+                              left: `${xPct}%`,
+                              top: yPos,
+                              width: size,
+                              height: size,
+                              zIndex: 6,
+                              cursor: 'pointer',
+                              animation: `float ${floatDur}s ease-in-out ${floatDelay}s infinite alternate`,
+                              filter: idx >= 2 ? `brightness(${0.85 - idx * 0.08})` : 'none',
+                            }}
                             onMouseMove={(e) => {
                               e.stopPropagation();
                               setHoveredBiota({ name: biotaName, ...BIOTA_INFO[biotaName], x: e.clientX, y: e.clientY });
@@ -704,27 +748,48 @@ export default function DigitalTwinPage() {
                               {modelSrc ? (
                                 <DigitalTwinModelViewer src={modelSrc} />
                               ) : (
-                                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                                  <Fish size={24} color="#ffffff" />
-                                </span>
+                                <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <Fish size={22} color="rgba(255,255,255,0.85)" />
+                                </div>
                               )}
                             </div>
                           );
                         })}
 
-                        {/* Seabed Graphic styling */}
+                        {/* Seabed texture on last layer */}
                         {idx === 3 && (
-                          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 28, background: 'linear-gradient(0deg, #0a192f 0%, transparent 100%)', zIndex: 4 }} />
+                          <>
+                            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 20, background: 'linear-gradient(0deg, #071a2e 0%, transparent 100%)', zIndex: 5, pointerEvents: 'none' }} />
+                            {/* Coral silhouettes */}
+                            <svg style={{ position: 'absolute', bottom: 0, left: 0, right: 0, width: '100%', height: 28, zIndex: 5, pointerEvents: 'none' }} viewBox="0 0 800 28" preserveAspectRatio="none">
+                              <path d="M0,28 L0,18 Q10,8 20,16 Q30,6 40,14 Q50,4 60,14 L80,28 Z" fill="rgba(2,47,73,0.8)" />
+                              <path d="M120,28 L120,14 Q132,4 144,14 Q156,6 168,16 Q176,8 184,18 L200,28 Z" fill="rgba(2,47,73,0.7)" />
+                              <path d="M300,28 L300,16 Q314,4 328,14 Q340,6 352,16 L370,28 Z" fill="rgba(2,47,73,0.75)" />
+                              <path d="M500,28 L500,18 Q512,6 524,14 Q534,4 546,14 Q556,8 564,18 L580,28 Z" fill="rgba(2,47,73,0.8)" />
+                              <path d="M680,28 L680,14 Q692,4 704,14 Q716,8 724,18 L740,28 Z" fill="rgba(2,47,73,0.7)" />
+                            </svg>
+                          </>
                         )}
-
                       </div>
                     );
                   })}
 
-                  {/* Depth meter legend */}
-                  <div style={{ position: 'absolute', right: 12, top: 65, bottom: 10, width: 32, zIndex: 20, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'center' }}>
+                  {/* === BUBBLE PARTICLES === */}
+                  {[8, 20, 35, 50, 65, 78, 90].map((xPct, i) => (
+                    <div key={i} style={{
+                      position: 'absolute', left: `${xPct}%`, bottom: 60 + (i % 3) * 80,
+                      width: 5 + (i % 3) * 3, height: 5 + (i % 3) * 3,
+                      borderRadius: '50%', background: 'rgba(255,255,255,0.35)',
+                      border: '1px solid rgba(255,255,255,0.5)',
+                      zIndex: 8, pointerEvents: 'none',
+                      animation: `bubbleRise ${3 + i * 0.6}s ease-in ${i * 0.7}s infinite`,
+                    }} />
+                  ))}
+
+                  {/* Depth scale */}
+                  <div style={{ position: 'absolute', right: 10, top: 60, bottom: 6, width: 28, zIndex: 20, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'center' }}>
                     {['0m', '5m', '15m', '30m'].map((d) => (
-                      <div key={d} style={{ fontSize: '0.625rem', fontWeight: 800, color: '#ffffff', background: 'rgba(0,0,0,0.4)', padding: '2px 6px', borderRadius: 4, backdropFilter: 'blur(4px)' }}>{d}</div>
+                      <div key={d} style={{ fontSize: '0.55rem', fontWeight: 800, color: '#fff', background: 'rgba(0,0,0,0.4)', padding: '1px 5px', borderRadius: 4, backdropFilter: 'blur(4px)' }}>{d}</div>
                     ))}
                   </div>
 
@@ -815,7 +880,6 @@ export default function DigitalTwinPage() {
               </div>
               ); // End of IIFE return
             })()}
-          </>
 
       </div>
 
@@ -866,6 +930,15 @@ export default function DigitalTwinPage() {
         @keyframes fadeInUp {
           from { opacity: 0; transform: translateY(10px); }
           to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes lightRay {
+          from { opacity: 0.6; transform: scaleX(1) rotate(var(--r, 0deg)); }
+          to   { opacity: 0.25; transform: scaleX(1.15) rotate(var(--r, 0deg)); }
+        }
+        @keyframes bubbleRise {
+          0%   { transform: translateY(0) scale(1); opacity: 0.6; }
+          80%  { opacity: 0.3; }
+          100% { transform: translateY(-320px) scale(0.5); opacity: 0; }
         }
       `}</style>
     </div>

@@ -248,9 +248,11 @@ export default function LandingPage({ onDemoLogin }) {
       </section>
 
       {/* 3. Product Showcase - OceanBot (Apple Style) */}
-      <section className="bg-dots" style={{ 
+      <section style={{ 
         padding: '6rem 2rem', 
-        background: '#fbfbfd', 
+        background: '#fbfbfd',
+        backgroundImage: 'radial-gradient(circle, #cbd5e1 1px, transparent 1px)',
+        backgroundSize: '28px 28px',
         borderBottom: '1px solid #e2e8f0', 
         display: 'flex', 
         flexDirection: 'column', 
@@ -262,7 +264,7 @@ export default function LandingPage({ onDemoLogin }) {
               INTERACTIVE MASCOT
             </span>
             <h2 style={{ fontSize: '2.5rem', fontWeight: 800, color: '#1d1d1f', marginBottom: '1rem', letterSpacing: '-0.02em' }}>
-              Kenalkan OceanBot.
+              Kenalkan CeanBot.
             </h2>
             <p style={{ color: '#515154', fontSize: '1rem', lineHeight: 1.6, margin: 0 }}>
               Asisten robotik virtual 3D Anda. Membantu memvisualisasikan kualitas perairan langsung dari platform web.
@@ -431,7 +433,7 @@ export default function LandingPage({ onDemoLogin }) {
       </section>
 
       {/* 6. Workflow Section */}
-      <section style={{ padding: '6rem 2rem', background: '#ffffff', position: 'relative' }}>
+      <section style={{ padding: '6rem 2rem', background: '#ffffff', backgroundImage: 'radial-gradient(circle, #cbd5e1 1px, transparent 1px)', backgroundSize: '28px 28px', position: 'relative' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
           <div style={{ textAlign: 'center', marginBottom: '4rem' }}>
             <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#023e8a', textTransform: 'uppercase', letterSpacing: 1.5, display: 'block', marginBottom: '0.5rem' }}>

@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { useState, useEffect } from 'react';
+import { AlertProvider } from './components/AlertNotifier';
 import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
 import MapPage from './pages/MapPage';
@@ -18,6 +19,7 @@ import OperatorAccountFormPage from './pages/OperatorAccountFormPage';
 import ProfilePage from './pages/ProfilePage';
 import ChatbotWidget from './components/ChatbotWidget';
 import TermsPage from './pages/TermsPage';
+import SimulatorPage from './pages/SimulatorPage';
 import './index.css';
 
 // Layout pembungkus untuk halaman yang memerlukan autentikasi
@@ -76,17 +78,18 @@ function App() {
   return (
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
       <BrowserRouter>
-        <Routes>
-          {/* Public Routes */}
-          <Route path="/" element={
-            isAuthenticated ? <Navigate to="/dashboard" /> : <LandingPage onDemoLogin={() => handleLogin('pengguna')} />
-          } />
-          <Route path="/login" element={
-            isAuthenticated ? <Navigate to="/dashboard" /> : <LoginPage onLogin={handleLogin} />
-          } />
-          <Route path="/register" element={
-            isAuthenticated ? <Navigate to="/dashboard" /> : <RegisterPage />
-          } />
+        <AlertProvider>
+          <Routes>
+            {/* Public Routes */}
+            <Route path="/" element={
+              isAuthenticated ? <Navigate to="/dashboard" /> : <LandingPage onDemoLogin={() => handleLogin('pengguna')} />
+            } />
+            <Route path="/login" element={
+              isAuthenticated ? <Navigate to="/dashboard" /> : <LoginPage onLogin={handleLogin} />
+            } />
+            <Route path="/register" element={
+              isAuthenticated ? <Navigate to="/dashboard" /> : <RegisterPage />
+            } />
           <Route path="/terms" element={<TermsPage />} />
 
           {/* Protected Routes — semua role */}
@@ -98,6 +101,7 @@ function App() {
           <Route path="/biota" element={isAuthenticated ? <ProtectedLayout><BiotaPage /></ProtectedLayout> : <Navigate to="/login" />} />
           <Route path="/alerts" element={isAuthenticated ? <ProtectedLayout><AlertsPage /></ProtectedLayout> : <Navigate to="/login" />} />
           <Route path="/profile" element={isAuthenticated ? <ProtectedLayout><ProfilePage /></ProtectedLayout> : <Navigate to="/login" />} />
+          <Route path="/simulator" element={isAuthenticated ? <ProtectedLayout><SimulatorPage /></ProtectedLayout> : <Navigate to="/login" />} />
 
           {/* Operator-Only Routes */}
           <Route path="/operator" element={
@@ -114,6 +118,7 @@ function App() {
           {/* Fallback */}
           <Route path="*" element={<Navigate to={isAuthenticated ? "/dashboard" : "/"} />} />
         </Routes>
+      </AlertProvider>
       </BrowserRouter>
     </GoogleOAuthProvider>
   );
