@@ -58,4 +58,4 @@ export const AlertProvider = ({ children }) => {
   );
 };
 
-export const useAlert = () => useContext(AlertContext);
+export const useAlert = () => useContext(AlertContext) || { alerts: [], setAlerts: () => {}, isConnected: false };

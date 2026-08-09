@@ -65,7 +65,9 @@ export default function RegisterPage() {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: '#0a4a8f',
+      background: '#ffffff',
+      backgroundImage: 'radial-gradient(circle, #cbd5e1 1px, transparent 1px)',
+      backgroundSize: '28px 28px',
       padding: '1.5rem',
       boxSizing: 'border-box',
     }}>
@@ -89,13 +91,11 @@ export default function RegisterPage() {
           position: 'relative',
           overflow: 'hidden',
         }}>
-          {/* Background video */}
+          {/* Background video — pure, no overlay */}
           <video autoPlay loop muted playsInline
             style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0 }}>
             <source src="/bg-ocean.mp4" type="video/mp4" />
           </video>
-          {/* Dark overlay */}
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(160deg, rgba(2,62,138,0.82) 0%, rgba(0,119,182,0.65) 100%)', zIndex: 1 }} />
 
           {/* Logo */}
           <div style={{ position: 'relative', zIndex: 1 }}>

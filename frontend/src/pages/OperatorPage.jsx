@@ -20,17 +20,29 @@ export default function OperatorPage() {
   const [operators, setOperators] = useState([]);
   const [loadingOperators, setLoadingOperators] = useState(false);
 
+  // Filter states for Sensor tab
+  const [filterProvinsi, setFilterProvinsi] = useState('all');
+  const [filterWilayah, setFilterWilayah] = useState('all');
+
+  const uniqueProvinces = [...new Set(sensors.map(s => s.provinsi).filter(Boolean))].sort();
+  const uniqueWilayahs = [...new Set(
+    sensors
+      .filter(s => filterProvinsi === 'all' || s.provinsi === filterProvinsi)
+      .map(s => s.wilayah)
+      .filter(Boolean)
+  )].sort();
+
+  const filteredSensors = sensors.filter(s => {
+    const matchProv = filterProvinsi === 'all' || s.provinsi === filterProvinsi;
+    const matchWil = filterWilayah === 'all' || s.wilayah === filterWilayah;
+    return matchProv && matchWil;
+  });
+
   // ── Fetch dari backend ──
   const fetchSensors = () => {
     setLoadingSensors(true);
     api.get('/sensors')
-      .then(res => {
-        let list = res.data;
-        if (userRole === 'operator' && userWilayah) {
-          list = list.filter(s => s.wilayah === userWilayah);
-        }
-        setSensors(list);
-      })
+      .then(res => setSensors(res.data))  // Backend already filters by role via X-User-Wilayah header
       .catch(() => {})
       .finally(() => setLoadingSensors(false));
   };
@@ -173,7 +185,7 @@ export default function OperatorPage() {
                 style={{ padding: '0.625rem', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '0.5rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }} 
                 title="Refresh"
               >
-                <RefreshCw size={16} color="#475569" />
+                <RefreshCw size={16} color="#023e8a" />
               </button>
               
               <button
@@ -205,18 +217,105 @@ export default function OperatorPage() {
               <span>Memuat data sensor...</span>
             </div>
           ) : (
-            <div style={{ background: '#fff', borderRadius: '1rem', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.01)' }}>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                      {['ID Sensor', 'Nama Lokasi / Wilayah', 'Zona', 'Koordinat', 'Kedalaman', 'Daya Baterai', 'Status', 'Aksi'].map(h => (
-                        <th key={h} style={{ padding: '1rem', textAlign: 'left', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sensors.map((s, i) => (
+            <>
+              {/* Filter Bar */}
+              <div style={{ 
+                background: '#fff', 
+                border: '1px solid #e2e8f0', 
+                borderRadius: '0.75rem', 
+                padding: '0.65rem 1rem', 
+                boxShadow: '0 1px 3px rgba(0,0,0,0.02)', 
+                marginBottom: '1.25rem', 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '1.25rem', 
+                flexWrap: 'wrap' 
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#023e8a', fontWeight: 700, fontSize: '0.8125rem' }}>
+                  <MapPin size={14} color="#023e8a" />
+                  <span>Filter</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '0.4rem', padding: '0.2rem 0.5rem' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>Provinsi:</span>
+                  <select
+                    value={filterProvinsi}
+                    onChange={e => {
+                      setFilterProvinsi(e.target.value);
+                      setFilterWilayah('all');
+                    }}
+                    style={{
+                      border: 'none',
+                      background: 'transparent',
+                      fontSize: '0.8125rem',
+                      fontWeight: 700,
+                      color: '#0f172a',
+                      outline: 'none',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="all">Semua Provinsi</option>
+                    {uniqueProvinces.map(p => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '0.4rem', padding: '0.2rem 0.5rem' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>Wilayah:</span>
+                  <select
+                    value={filterWilayah}
+                    onChange={e => setFilterWilayah(e.target.value)}
+                    style={{
+                      border: 'none',
+                      background: 'transparent',
+                      fontSize: '0.8125rem',
+                      fontWeight: 700,
+                      color: '#0f172a',
+                      outline: 'none',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="all">Semua Wilayah</option>
+                    {uniqueWilayahs.map(w => (
+                      <option key={w} value={w}>{w}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {(filterProvinsi !== 'all' || filterWilayah !== 'all') && (
+                  <button
+                    onClick={() => {
+                      setFilterProvinsi('all');
+                      setFilterWilayah('all');
+                    }}
+                    style={{
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      color: '#be123c',
+                      cursor: 'pointer',
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      textDecoration: 'underline'
+                    }}
+                  >
+                    Reset Filter
+                  </button>
+                )}
+              </div>
+
+              <div style={{ background: '#fff', borderRadius: '1rem', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.01)' }}>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                        {['ID Sensor', 'Nama Lokasi / Wilayah', 'Zona', 'Koordinat', 'Kedalaman', 'Daya Baterai', 'Status', 'Aksi'].map(h => (
+                          <th key={h} style={{ padding: '1rem', textAlign: 'left', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredSensors.map((s, i) => (
                       <tr 
                         key={s.sensor_id} 
                         style={{ borderBottom: i < sensors.length - 1 ? '1px solid #f1f5f9' : 'none', transition: 'background 0.2s' }} 
@@ -268,7 +367,7 @@ export default function OperatorPage() {
                           <div style={{ display: 'flex', gap: '0.5rem' }}>
                             <button 
                               onClick={() => navigate(`/operator/sensors/edit/${s.sensor_id}`)} 
-                              style={{ padding: '0.4rem 0.75rem', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '0.375rem', color: '#1d4ed8', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.78rem', fontWeight: 700 }}
+                              style={{ padding: '0.4rem 0.75rem', background: '#e0f2fe', border: '1px solid #bae6fd', borderRadius: '0.375rem', color: '#023e8a', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.78rem', fontWeight: 700 }}
                             >
                               <Edit3 size={12} /> Edit
                             </button>
@@ -282,10 +381,12 @@ export default function OperatorPage() {
                         </td>
                       </tr>
                     ))}
-                    {sensors.length === 0 && (
+                    {filteredSensors.length === 0 && (
                       <tr>
                         <td colSpan={8} style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
-                          Belum ada sensor terdaftar untuk wilayah Anda.
+                          {sensors.length === 0 
+                            ? 'Belum ada sensor terdaftar untuk wilayah Anda.' 
+                            : 'Tidak ada sensor yang cocok dengan filter yang dipilih.'}
                         </td>
                       </tr>
                     )}
@@ -293,7 +394,8 @@ export default function OperatorPage() {
                 </table>
               </div>
             </div>
-          )}
+          </>
+        )}
         </div>
       )}
 
@@ -312,7 +414,7 @@ export default function OperatorPage() {
                 style={{ padding: '0.625rem', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '0.5rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }} 
                 title="Refresh"
               >
-                <RefreshCw size={16} color="#475569" />
+                <RefreshCw size={16} color="#023e8a" />
               </button>
               
               <button 
@@ -415,7 +517,7 @@ export default function OperatorPage() {
                       <div style={{ display: 'flex', gap: '0.375rem' }}>
                         <button 
                           onClick={() => navigate(`/operator/biota/edit/${s.biota_id}`)} 
-                          style={{ padding: '0.3rem 0.625rem', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '0.375rem', color: '#1d4ed8', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700 }}
+                          style={{ padding: '0.3rem 0.625rem', background: '#e0f2fe', border: '1px solid #bae6fd', borderRadius: '0.375rem', color: '#023e8a', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700 }}
                         >
                           Edit
                         </button>
@@ -454,7 +556,7 @@ export default function OperatorPage() {
                 onClick={fetchOperators} 
                 style={{ padding: '0.625rem', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '0.5rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}
               >
-                <RefreshCw size={16} color="#475569" />
+                <RefreshCw size={16} color="#023e8a" />
               </button>
               
               <button 
@@ -530,24 +632,32 @@ export default function OperatorPage() {
                           </span>
                         </td>
                         <td style={{ padding: '1rem' }}>
-                          <button 
-                            onClick={() => handleDeleteOp(op)} 
-                            style={{ 
-                              padding: '0.4rem 0.75rem', 
-                              background: '#fff1f2', 
-                              border: '1px solid #fecdd3', 
-                              borderRadius: '0.375rem', 
-                              color: '#be123c', 
-                              cursor: 'pointer', 
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              gap: 4, 
-                              fontSize: '0.78rem', 
-                              fontWeight: 700 
-                            }}
-                          >
-                            <Trash2 size={12} /> Hapus
-                          </button>
+                          <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <button 
+                              onClick={() => navigate(`/operator/accounts/edit/${op.id}`)} 
+                              style={{ padding: '0.4rem 0.75rem', background: '#e0f2fe', border: '1px solid #bae6fd', borderRadius: '0.375rem', color: '#023e8a', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.78rem', fontWeight: 700 }}
+                            >
+                              <Edit3 size={12} /> Edit
+                            </button>
+                            <button 
+                              onClick={() => handleDeleteOp(op)} 
+                              style={{ 
+                                padding: '0.4rem 0.75rem', 
+                                background: '#fff1f2', 
+                                border: '1px solid #fecdd3', 
+                                borderRadius: '0.375rem', 
+                                color: '#be123c', 
+                                cursor: 'pointer', 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: 4, 
+                                fontSize: '0.78rem', 
+                                fontWeight: 700 
+                              }}
+                            >
+                              <Trash2 size={12} /> Hapus
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}

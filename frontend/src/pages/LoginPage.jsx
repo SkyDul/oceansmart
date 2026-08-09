@@ -33,7 +33,7 @@ export default function LoginPage({ onLogin }) {
     try {
       const res = await api.post('/login', { email, password });
       setIsLoading(false);
-      localStorage.setItem('ocean_user', JSON.stringify({ name: res.data.name, email: res.data.email }));
+      localStorage.setItem('ocean_user', JSON.stringify({ id: res.data.id, name: res.data.name, email: res.data.email, no_hp: res.data.no_hp || '' }));
       if (rememberMe) {
         localStorage.setItem('ocean_remembered_email', email);
         localStorage.setItem('ocean_remembered_password', password);
@@ -63,7 +63,7 @@ export default function LoginPage({ onLogin }) {
           google_id: userInfo.data.sub
         });
         setIsLoading(false);
-        localStorage.setItem('ocean_user', JSON.stringify(userInfo.data));
+        localStorage.setItem('ocean_user', JSON.stringify({ id: res.data.id, name: res.data.name, email: res.data.email, picture: userInfo.data.picture, no_hp: res.data.no_hp || '' }));
         onLogin(res.data.role, res.data.wilayah, res.data.provinsi);
         navigate('/dashboard');
       } catch (err) {
@@ -88,8 +88,9 @@ export default function LoginPage({ onLogin }) {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: '#0a4a8f',
-      backgroundImage: 'linear-gradient(135deg, #023e8a 0%, #0077b6 100%), radial-gradient(circle at 30% 50%, rgba(0,180,216,0.3) 0%, transparent 60%)',
+      background: '#ffffff',
+      backgroundImage: 'radial-gradient(circle, #cbd5e1 1px, transparent 1px)',
+      backgroundSize: '28px 28px',
       padding: '1.5rem',
       boxSizing: 'border-box',
     }}>
@@ -115,13 +116,11 @@ export default function LoginPage({ onLogin }) {
           position: 'relative',
           overflow: 'hidden',
         }}>
-          {/* Background video */}
+          {/* Background video — pure, no overlay */}
           <video autoPlay loop muted playsInline
             style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0 }}>
             <source src="/bg-ocean.mp4" type="video/mp4" />
           </video>
-          {/* Dark overlay */}
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(160deg, rgba(2,62,138,0.82) 0%, rgba(0,119,182,0.65) 100%)', zIndex: 1 }} />
 
           {/* Logo */}
           <div style={{ position: 'relative', zIndex: 1 }}>

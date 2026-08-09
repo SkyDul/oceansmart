@@ -12,55 +12,113 @@ from app.models import Sensor, SensorReading, Alert, Biota, ConservationZone, Us
 # -------------------- THRESHOLDS --------------------
 
 THRESHOLDS = {
-    "ph": {"min": 7.5, "max": 8.5, "normal_min": 7.8, "normal_max": 8.3},
-    "suhu_celsius": {"min": 26, "max": 30, "normal_min": 27, "normal_max": 29},
-    "salinitas_ppt": {"min": 30, "max": 35, "normal_min": 31, "normal_max": 34},
-    "do_mg_l": {"min": 5, "max": 12, "normal_min": 5.5, "normal_max": 8},
-    "kekeruhan_ntu": {"min": 0, "max": 10, "normal_min": 1, "normal_max": 6},
+    "ph":            {"min": 7.5, "max": 8.5, "warn_min": 7.7, "warn_max": 8.3},
+    "suhu_celsius":  {"min": 26,  "max": 30,  "warn_min": 26.5,"warn_max": 29.5},
+    "salinitas_ppt": {"min": 30,  "max": 35,  "warn_min": 30.5,"warn_max": 34.5},
+    "do_mg_l":       {"min": 5,   "max": 12,  "warn_min": 5.5, "warn_max": 11},
+    "kekeruhan_ntu": {"min": 0,   "max": 10,  "warn_min": 0,   "warn_max": 7},
+}
+
+# Karakteristik dasar tiap wilayah — berpengaruh ke base value generator
+# Sehingga data tiap wilayah berbeda tapi tetap realistis
+WILAYAH_PROFILE = {
+    # Jawa Barat Selatan — pesisir selatan, ombak lebih tinggi
+    "Pangandaran": {"ph_bias": 0.02,  "suhu_bias": 0.0,  "sal_bias": 0.2,  "do_bias": 0.3,  "turb_bias": 0.5,  "anomaly_rate": 0.01},
+    "Sukabumi":    {"ph_bias": 0.0,   "suhu_bias": -0.3, "sal_bias": 0.0,  "do_bias": 0.5,  "turb_bias": 0.3,  "anomaly_rate": 0.015},
+    # Jawa Barat Utara (Pantura) — lebih tercemar, turbidity lebih tinggi
+    "Indramayu":   {"ph_bias": -0.05, "suhu_bias": 0.5,  "sal_bias": -0.3, "do_bias": -0.4, "turb_bias": 2.0,  "anomaly_rate": 0.04},
+    "Cirebon":           {"ph_bias": -0.08, "suhu_bias": 0.6,  "sal_bias": -0.5, "do_bias": -0.5, "turb_bias": 2.5,  "anomaly_rate": 0.05},
+    "Karawang":          {"ph_bias": -0.06, "suhu_bias": 0.4,  "sal_bias": -0.4, "do_bias": -0.3, "turb_bias": 1.8,  "anomaly_rate": 0.03},
+    "Subang":            {"ph_bias": -0.04, "suhu_bias": 0.3,  "sal_bias": -0.2, "do_bias": -0.2, "turb_bias": 1.5,  "anomaly_rate": 0.025},
+    # Bali — kondisi terbaik
+    "Nusa Penida":       {"ph_bias": 0.05,  "suhu_bias": -0.2, "sal_bias": 0.5,  "do_bias": 0.8,  "turb_bias": -0.5, "anomaly_rate": 0.005},
+    "Denpasar":          {"ph_bias": 0.0,   "suhu_bias": 0.1,  "sal_bias": 0.3,  "do_bias": 0.4,  "turb_bias": 0.2,  "anomaly_rate": 0.02},
+    "Buleleng":          {"ph_bias": 0.02,  "suhu_bias": -0.1, "sal_bias": 0.4,  "do_bias": 0.6,  "turb_bias": 0.1,  "anomaly_rate": 0.01},
+    # Jawa Timur
+    "Banyuwangi":        {"ph_bias": 0.03,  "suhu_bias": 0.2,  "sal_bias": 0.2,  "do_bias": 0.3,  "turb_bias": 0.4,  "anomaly_rate": 0.015},
+    "Malang":            {"ph_bias": 0.0,   "suhu_bias": -0.1, "sal_bias": 0.1,  "do_bias": 0.5,  "turb_bias": 0.6,  "anomaly_rate": 0.02},
+    # Wilayah Konservasi Nasional
+    "Karimunjawa":       {"ph_bias": 0.04,  "suhu_bias": 0.1,  "sal_bias": 0.4,  "do_bias": 0.6,  "turb_bias": -0.3, "anomaly_rate": 0.01},
+    "Parangtritis":      {"ph_bias": -0.02, "suhu_bias": 0.3,  "sal_bias": -0.2, "do_bias": 0.0,  "turb_bias": 1.2,  "anomaly_rate": 0.03},
+    "Wakatobi":          {"ph_bias": 0.06,  "suhu_bias": -0.3, "sal_bias": 0.6,  "do_bias": 1.0,  "turb_bias": -0.8, "anomaly_rate": 0.003},
+    "Bunaken":           {"ph_bias": 0.07,  "suhu_bias": -0.4, "sal_bias": 0.7,  "do_bias": 1.2,  "turb_bias": -1.0, "anomaly_rate": 0.002},
+    "Raja Ampat":        {"ph_bias": 0.08,  "suhu_bias": -0.5, "sal_bias": 0.8,  "do_bias": 1.5,  "turb_bias": -1.2, "anomaly_rate": 0.001},
+    "Manggarai Barat":   {"ph_bias": 0.05,  "suhu_bias": -0.2, "sal_bias": 0.5,  "do_bias": 0.9,  "turb_bias": -0.6, "anomaly_rate": 0.005},
+    "Maluku Tengah":     {"ph_bias": 0.04,  "suhu_bias": -0.1, "sal_bias": 0.4,  "do_bias": 0.7,  "turb_bias": -0.4, "anomaly_rate": 0.008},
+    # Default
+    "default":           {"ph_bias": 0.0,   "suhu_bias": 0.0,  "sal_bias": 0.0,  "do_bias": 0.0,  "turb_bias": 0.0,  "anomaly_rate": 0.02},
 }
 
 
 # -------------------- SENSOR DATA --------------------
+# Setiap sensor punya sensor_id unik, nama_lokasi berbeda, dan wilayah masing-masing
+# Ini adalah data awal — operator dapat menambah sensor baru via CRUD
 
 SENSORS_DATA = [
-    # Pangandaran (Pesisir Selatan Jabar)
-    {"sensor_id": "OS-SENSOR-001", "nama_lokasi": "Cagar Alam Laut Pangandaran", "lat": -7.7100, "lng": 108.6500, "kedalaman_m": 3, "zona": "inti", "provinsi": "Jawa Barat", "wilayah": "Pangandaran"},
-    {"sensor_id": "OS-SENSOR-002", "nama_lokasi": "Padang Lamun Karapyak Pangandaran", "lat": -7.7200, "lng": 108.6200, "kedalaman_m": 5, "zona": "pemanfaatan_terbatas", "provinsi": "Jawa Barat", "wilayah": "Pangandaran"},
-    {"sensor_id": "OS-SENSOR-003", "nama_lokasi": "Dermaga Batu Hiu Pangandaran", "lat": -7.6800, "lng": 108.5900, "kedalaman_m": 1, "zona": "pemanfaatan_umum", "provinsi": "Jawa Barat", "wilayah": "Pangandaran"},
-    
-    # Sukabumi / Pelabuhan Ratu (Pesisir Selatan Jabar)
-    {"sensor_id": "OS-SENSOR-004", "nama_lokasi": "Teluk Pelabuhan Ratu Sukabumi", "lat": -6.9800, "lng": 106.5500, "kedalaman_m": 12, "zona": "inti", "provinsi": "Jawa Barat", "wilayah": "Sukabumi"},
-    {"sensor_id": "OS-SENSOR-005", "nama_lokasi": "Karang Hawu Pelabuhan Ratu", "lat": -6.9500, "lng": 106.4500, "kedalaman_m": 6, "zona": "pemanfaatan_terbatas", "provinsi": "Jawa Barat", "wilayah": "Sukabumi"},
+    # ── Pangandaran (Jabar Selatan) — 3 sensor, kondisi baik ──
+    {"sensor_id": "OS-PGD-001", "nama_lokasi": "Cagar Alam Laut Pangandaran", "lat": -7.7100, "lng": 108.6500, "kedalaman_m": 3, "zona": "inti", "provinsi": "Jawa Barat", "wilayah": "Pangandaran"},
+    {"sensor_id": "OS-PGD-002", "nama_lokasi": "Padang Lamun Karapyak", "lat": -7.7200, "lng": 108.6200, "kedalaman_m": 5, "zona": "pemanfaatan_terbatas", "provinsi": "Jawa Barat", "wilayah": "Pangandaran"},
+    {"sensor_id": "OS-PGD-003", "nama_lokasi": "Dermaga Batu Hiu Pangandaran", "lat": -7.6800, "lng": 108.5900, "kedalaman_m": 1, "zona": "pemanfaatan_umum", "provinsi": "Jawa Barat", "wilayah": "Pangandaran"},
 
-    # Indramayu (Pantura Jabar)
-    {"sensor_id": "OS-SENSOR-006", "nama_lokasi": "Hutan Mangrove Karangsong Indramayu", "lat": -6.3300, "lng": 108.3600, "kedalaman_m": 2, "zona": "rehabilitasi", "provinsi": "Jawa Barat", "wilayah": "Indramayu"},
-    {"sensor_id": "OS-SENSOR-007", "nama_lokasi": "Pantai Tirta Maya Indramayu", "lat": -6.3800, "lng": 108.4200, "kedalaman_m": 4, "zona": "pemanfaatan_umum", "provinsi": "Jawa Barat", "wilayah": "Indramayu"},
+    # ── Sukabumi / Pelabuhan Ratu (Jabar Selatan) — 2 sensor ──
+    {"sensor_id": "OS-SKB-001", "nama_lokasi": "Teluk Pelabuhan Ratu", "lat": -6.9800, "lng": 106.5500, "kedalaman_m": 12, "zona": "inti", "provinsi": "Jawa Barat", "wilayah": "Sukabumi"},
+    {"sensor_id": "OS-SKB-002", "nama_lokasi": "Karang Hawu Pelabuhan Ratu", "lat": -6.9500, "lng": 106.4500, "kedalaman_m": 6, "zona": "pemanfaatan_terbatas", "provinsi": "Jawa Barat", "wilayah": "Sukabumi"},
 
-    # Cirebon (Pantura Jabar)
-    {"sensor_id": "OS-SENSOR-008", "nama_lokasi": "Pesisir Kejawanan Cirebon", "lat": -6.7300, "lng": 108.5700, "kedalaman_m": 3, "zona": "rehabilitasi", "provinsi": "Jawa Barat", "wilayah": "Cirebon"},
+    # ── Indramayu (Pantura Jabar) — 2 sensor, sedikit tercemar ──
+    {"sensor_id": "OS-IDR-001", "nama_lokasi": "Mangrove Karangsong Indramayu", "lat": -6.3300, "lng": 108.3600, "kedalaman_m": 2, "zona": "rehabilitasi", "provinsi": "Jawa Barat", "wilayah": "Indramayu"},
+    {"sensor_id": "OS-IDR-002", "nama_lokasi": "Pantai Tirta Maya Indramayu", "lat": -6.3800, "lng": 108.4200, "kedalaman_m": 4, "zona": "pemanfaatan_umum", "provinsi": "Jawa Barat", "wilayah": "Indramayu"},
 
-    # Karawang (Pantura Jabar)
-    {"sensor_id": "OS-SENSOR-009", "nama_lokasi": "Tanjung Pakis Karawang", "lat": -5.9600, "lng": 107.1600, "kedalaman_m": 2, "zona": "pemanfaatan_terbatas", "provinsi": "Jawa Barat", "wilayah": "Karawang"},
+    # ── Cirebon (Pantura Jabar) — 2 sensor, tercemar industri ──
+    {"sensor_id": "OS-CRB-001", "nama_lokasi": "Pesisir Kejawanan Cirebon", "lat": -6.7300, "lng": 108.5700, "kedalaman_m": 3, "zona": "rehabilitasi", "provinsi": "Jawa Barat", "wilayah": "Cirebon"},
+    {"sensor_id": "OS-CRB-002", "nama_lokasi": "Muara Sungai Cimanuk Cirebon", "lat": -6.7500, "lng": 108.5500, "kedalaman_m": 1, "zona": "rehabilitasi", "provinsi": "Jawa Barat", "wilayah": "Cirebon"},
 
-    # Subang (Pantura Jabar)
-    {"sensor_id": "OS-SENSOR-010", "nama_lokasi": "Pantai Pondok Bali Subang", "lat": -6.2100, "lng": 107.8200, "kedalaman_m": 3, "zona": "pemanfaatan_umum", "provinsi": "Jawa Barat", "wilayah": "Subang"},
+    # ── Karawang & Subang (Pantura Jabar) — 1 sensor masing-masing ──
+    {"sensor_id": "OS-KRW-001", "nama_lokasi": "Tanjung Pakis Karawang", "lat": -5.9600, "lng": 107.1600, "kedalaman_m": 2, "zona": "pemanfaatan_terbatas", "provinsi": "Jawa Barat", "wilayah": "Karawang"},
+    {"sensor_id": "OS-SBG-001", "nama_lokasi": "Pantai Pondok Bali Subang", "lat": -6.2100, "lng": 107.8200, "kedalaman_m": 3, "zona": "pemanfaatan_umum", "provinsi": "Jawa Barat", "wilayah": "Subang"},
 
-    # Bali
-    {"sensor_id": "OS-SENSOR-011", "nama_lokasi": "Kawasan Konservasi Nusa Penida", "lat": -8.7200, "lng": 115.5300, "kedalaman_m": 8, "zona": "inti", "provinsi": "Bali", "wilayah": "Nusa Penida"},
-    {"sensor_id": "OS-SENSOR-012", "nama_lokasi": "Pantai Sanur Bali", "lat": -8.6700, "lng": 115.2600, "kedalaman_m": 2, "zona": "pemanfaatan_umum", "provinsi": "Bali", "wilayah": "Denpasar"},
+    # ── Parangtritis (DIY) — 2 sensor, ombak tinggi ──
+    {"sensor_id": "OS-PRG-001", "nama_lokasi": "Pantai Parangtritis Utama", "lat": -8.0257, "lng": 110.3324, "kedalaman_m": 4, "zona": "pemanfaatan_umum", "provinsi": "DI Yogyakarta", "wilayah": "Parangtritis"},
+    {"sensor_id": "OS-PRG-002", "nama_lokasi": "Laguna Pantai Depok Bantul", "lat": -7.9900, "lng": 110.2900, "kedalaman_m": 2, "zona": "pemanfaatan_terbatas", "provinsi": "DI Yogyakarta", "wilayah": "Parangtritis"},
 
-    # Jawa Timur
-    {"sensor_id": "OS-SENSOR-013", "nama_lokasi": "Taman Nasional Alas Purwo", "lat": -8.7000, "lng": 114.3600, "kedalaman_m": 10, "zona": "inti", "provinsi": "Jawa Timur", "wilayah": "Banyuwangi"},
-    {"sensor_id": "OS-SENSOR-014", "nama_lokasi": "Pulau Sempu Malang", "lat": -8.4300, "lng": 112.6900, "kedalaman_m": 6, "zona": "pemanfaatan_terbatas", "provinsi": "Jawa Timur", "wilayah": "Malang"},
+    # ── Karimunjawa (Jateng) — 3 sensor, kondisi baik ──
+    {"sensor_id": "OS-KJW-001", "nama_lokasi": "Taman Nasional Karimunjawa Inti", "lat": -5.8670, "lng": 110.4388, "kedalaman_m": 8, "zona": "inti", "provinsi": "Jawa Tengah", "wilayah": "Karimunjawa"},
+    {"sensor_id": "OS-KJW-002", "nama_lokasi": "Perairan Pulau Menjangan Karimunjawa", "lat": -5.8200, "lng": 110.4800, "kedalaman_m": 12, "zona": "pemanfaatan_terbatas", "provinsi": "Jawa Tengah", "wilayah": "Karimunjawa"},
+    {"sensor_id": "OS-KJW-003", "nama_lokasi": "Zona Snorkeling Karimunjawa", "lat": -5.8900, "lng": 110.4200, "kedalaman_m": 3, "zona": "pemanfaatan_umum", "provinsi": "Jawa Tengah", "wilayah": "Karimunjawa"},
 
-    # Nusa Tenggara Timur (NTT)
-    {"sensor_id": "OS-SENSOR-015", "nama_lokasi": "Taman Nasional Komodo", "lat": -8.5300, "lng": 119.4500, "kedalaman_m": 15, "zona": "inti", "provinsi": "Nusa Tenggara Timur", "wilayah": "Manggarai Barat"},
+    # ── Bali — Nusa Penida (3 sensor, sangat bersih) ──
+    {"sensor_id": "OS-NPD-001", "nama_lokasi": "Konservasi Manta Point Nusa Penida", "lat": -8.7400, "lng": 115.4900, "kedalaman_m": 15, "zona": "inti", "provinsi": "Bali", "wilayah": "Nusa Penida"},
+    {"sensor_id": "OS-NPD-002", "nama_lokasi": "Crystal Bay Nusa Penida", "lat": -8.7200, "lng": 115.4700, "kedalaman_m": 10, "zona": "pemanfaatan_terbatas", "provinsi": "Bali", "wilayah": "Nusa Penida"},
+    {"sensor_id": "OS-NPD-003", "nama_lokasi": "Pantai Kelingking Nusa Penida", "lat": -8.7600, "lng": 115.4500, "kedalaman_m": 5, "zona": "pemanfaatan_umum", "provinsi": "Bali", "wilayah": "Nusa Penida"},
 
-    # Maluku
-    {"sensor_id": "OS-SENSOR-016", "nama_lokasi": "Taman Nasional Manusela", "lat": -2.9500, "lng": 129.5800, "kedalaman_m": 12, "zona": "rehabilitasi", "provinsi": "Maluku", "wilayah": "Maluku Tengah"},
+    # ── Bali — Buleleng / Lovina ──
+    {"sensor_id": "OS-BLL-001", "nama_lokasi": "Taman Laut Lovina Buleleng", "lat": -8.1600, "lng": 115.0200, "kedalaman_m": 6, "zona": "pemanfaatan_terbatas", "provinsi": "Bali", "wilayah": "Buleleng"},
+    {"sensor_id": "OS-BLL-002", "nama_lokasi": "Pantai Singaraja Buleleng", "lat": -8.1100, "lng": 115.0900, "kedalaman_m": 3, "zona": "pemanfaatan_umum", "provinsi": "Bali", "wilayah": "Buleleng"},
 
-    # Papua Barat Daya
-    {"sensor_id": "OS-SENSOR-017", "nama_lokasi": "Kepulauan Raja Ampat", "lat": -0.2300, "lng": 130.5200, "kedalaman_m": 20, "zona": "inti", "provinsi": "Papua Barat Daya", "wilayah": "Raja Ampat"},
+    # ── Jawa Timur — Banyuwangi / Alas Purwo ──
+    {"sensor_id": "OS-BWI-001", "nama_lokasi": "Taman Nasional Alas Purwo", "lat": -8.7000, "lng": 114.3600, "kedalaman_m": 10, "zona": "inti", "provinsi": "Jawa Timur", "wilayah": "Banyuwangi"},
+    {"sensor_id": "OS-BWI-002", "nama_lokasi": "Perairan Selat Bali Banyuwangi", "lat": -8.4000, "lng": 114.4000, "kedalaman_m": 8, "zona": "pemanfaatan_terbatas", "provinsi": "Jawa Timur", "wilayah": "Banyuwangi"},
+    {"sensor_id": "OS-BWI-003", "nama_lokasi": "Pantai Boom Banyuwangi", "lat": -8.2200, "lng": 114.3700, "kedalaman_m": 2, "zona": "pemanfaatan_umum", "provinsi": "Jawa Timur", "wilayah": "Banyuwangi"},
+
+    # ── Wakatobi (Sulawesi Tenggara) — 3 sensor, biodiversitas tinggi ──
+    {"sensor_id": "OS-WKT-001", "nama_lokasi": "Taman Nasional Wakatobi Inti", "lat": -5.3500, "lng": 123.5800, "kedalaman_m": 20, "zona": "inti", "provinsi": "Sulawesi Tenggara", "wilayah": "Wakatobi"},
+    {"sensor_id": "OS-WKT-002", "nama_lokasi": "Perairan Pulau Wangi-Wangi", "lat": -5.3200, "lng": 123.5400, "kedalaman_m": 12, "zona": "pemanfaatan_terbatas", "provinsi": "Sulawesi Tenggara", "wilayah": "Wakatobi"},
+    {"sensor_id": "OS-WKT-003", "nama_lokasi": "Dermaga Wisata Wakatobi", "lat": -5.3800, "lng": 123.6100, "kedalaman_m": 3, "zona": "pemanfaatan_umum", "provinsi": "Sulawesi Tenggara", "wilayah": "Wakatobi"},
+
+    # ── Bunaken (Sulawesi Utara) — 2 sensor, salah satu terbaik di dunia ──
+    {"sensor_id": "OS-BNK-001", "nama_lokasi": "Taman Laut Bunaken Inti", "lat": 1.6200, "lng": 124.7500, "kedalaman_m": 18, "zona": "inti", "provinsi": "Sulawesi Utara", "wilayah": "Bunaken"},
+    {"sensor_id": "OS-BNK-002", "nama_lokasi": "Perairan Pulau Manado Tua", "lat": 1.5800, "lng": 124.6900, "kedalaman_m": 10, "zona": "pemanfaatan_terbatas", "provinsi": "Sulawesi Utara", "wilayah": "Bunaken"},
+
+    # ── Komodo (NTT) — 2 sensor ──
+    {"sensor_id": "OS-KMD-001", "nama_lokasi": "Taman Nasional Komodo Laut", "lat": -8.5300, "lng": 119.4500, "kedalaman_m": 15, "zona": "inti", "provinsi": "Nusa Tenggara Timur", "wilayah": "Manggarai Barat"},
+    {"sensor_id": "OS-KMD-002", "nama_lokasi": "Perairan Pink Beach Komodo", "lat": -8.5800, "lng": 119.5000, "kedalaman_m": 5, "zona": "pemanfaatan_terbatas", "provinsi": "Nusa Tenggara Timur", "wilayah": "Manggarai Barat"},
+
+    # ── Raja Ampat (Papua Barat Daya) — 3 sensor, terkaya di dunia ──
+    {"sensor_id": "OS-RAA-001", "nama_lokasi": "Kepulauan Raja Ampat Inti", "lat": -0.2300, "lng": 130.5200, "kedalaman_m": 20, "zona": "inti", "provinsi": "Papua Barat Daya", "wilayah": "Raja Ampat"},
+    {"sensor_id": "OS-RAA-002", "nama_lokasi": "Misool Raja Ampat", "lat": -1.8700, "lng": 130.1400, "kedalaman_m": 15, "zona": "inti", "provinsi": "Papua Barat Daya", "wilayah": "Raja Ampat"},
+    {"sensor_id": "OS-RAA-003", "nama_lokasi": "Wayag Raja Ampat", "lat": 0.1900, "lng": 130.0200, "kedalaman_m": 8, "zona": "pemanfaatan_terbatas", "provinsi": "Papua Barat Daya", "wilayah": "Raja Ampat"},
+
+    # ── Maluku Tengah ──
+    {"sensor_id": "OS-MLK-001", "nama_lokasi": "Taman Nasional Manusela Maluku", "lat": -2.9500, "lng": 129.5800, "kedalaman_m": 12, "zona": "rehabilitasi", "provinsi": "Maluku", "wilayah": "Maluku Tengah"},
 ]
 
 
@@ -237,58 +295,69 @@ def update_realtime_ocean_cache():
 
 
 def generate_reading(base_time: datetime, sensor_data: dict, day_offset: int = 0, anomaly_type: str = "normal") -> dict:
-    """Generate a single sensor reading with realistic variations."""
-    # Add time-of-day variations
+    """Generate a single sensor reading with realistic per-wilayah variations."""
     hour = base_time.hour
     day_factor = math.sin((hour - 6) * math.pi / 12)  # peaks at noon
-
-    # Base values with sensor-specific bias
     depth_factor = sensor_data["kedalaman_m"] / 20.0
 
-    # Gunakan telemetri asli Jawa Barat (Pangandaran) jika data real-time (day_offset == 0)
+    # Ambil profil wilayah
+    wilayah = sensor_data.get("wilayah", "default")
+    profile = WILAYAH_PROFILE.get(wilayah, WILAYAH_PROFILE["default"])
+
+    # Base values dari realtime cache (Pangandaran reference)
     base_temp = 28.0
     base_wave = 1.0
     if day_offset == 0:
         base_temp = REALTIME_OCEAN_CACHE["sea_temperature"]
         base_wave = REALTIME_OCEAN_CACHE["wave_height"]
 
-    ph = 8.05 + random.gauss(0, 0.05) - depth_factor * 0.05
-    suhu = base_temp + day_factor * 0.5 + random.gauss(0, 0.2) - depth_factor * 0.5
-    salinitas = 32.5 + random.gauss(0, 0.3) + depth_factor * 0.3
-    
-    # DO & kekeruhan bereaksi secara dinamis dengan tinggi gelombang asli Jawa Barat
-    do_val = 6.2 + (base_wave * 0.4) + day_factor * 0.3 + random.gauss(0, 0.2) - depth_factor * 0.3
-    kekeruhan = 1.5 + (base_wave * 1.8) + random.gauss(0, 0.5) + (0.5 if sensor_data["zona"] == "rehabilitasi" else 0)
+    # Generate dengan variasi kecil + bias wilayah
+    ph       = 8.05 + profile["ph_bias"]   + random.gauss(0, 0.04) - depth_factor * 0.04
+    suhu     = base_temp + profile["suhu_bias"] + day_factor * 0.4 + random.gauss(0, 0.15) - depth_factor * 0.4
+    salinitas= 32.5 + profile["sal_bias"]  + random.gauss(0, 0.25) + depth_factor * 0.2
+    do_val   = 6.5 + profile["do_bias"]    + (base_wave * 0.3) + day_factor * 0.2 + random.gauss(0, 0.15) - depth_factor * 0.25
+    kekeruhan= 1.2 + profile["turb_bias"]  + (base_wave * 1.5) + random.gauss(0, 0.4)
+    if sensor_data["zona"] == "rehabilitasi":
+        kekeruhan += 0.8  # Zona rehabilitasi sedikit lebih keruh
 
-    # Terapkan Anomali Buatan dari Simulator jika aktif
+    # Terapkan Anomali Buatan dari Simulator
     if anomaly_type == "heatwave":
-        suhu += 4.0  # Kenaikan suhu ekstrem (+4 C)
-        do_val = max(2.0, do_val - 2.5)  # Oksigen terlarut turun karena panas air
+        suhu += 4.0
+        do_val = max(2.0, do_val - 2.5)
     elif anomaly_type == "acidification":
-        ph -= 1.1    # pH turun drastis menjadi sangat asam
+        ph -= 1.1
     elif anomaly_type == "storm":
-        salinitas -= 5.5  # Salinitas turun akibat limpasan air tawar hujan deras
-        kekeruhan += 15.0 # Kekeruhan melonjak karena pengadukan sedimen
-    # ~5% chance of random anomaly (hanya jika dalam kondisi normal)
-    elif random.random() < 0.05:
-        param = random.choice(["ph", "suhu", "salinitas", "do", "kekeruhan"])
-        if param == "ph":
-            ph += random.choice([-0.8, 0.8])
-        elif param == "suhu":
-            suhu += random.choice([-2.5, 3.0])
-        elif param == "salinitas":
-            salinitas += random.choice([-3, 3])
-        elif param == "do":
-            do_val -= 2.5
+        salinitas -= 5.5
+        kekeruhan += 15.0
+    # Anomali acak sesuai anomaly_rate wilayah (wilayah tercemar lebih sering anomali)
+    elif random.random() < profile["anomaly_rate"]:
+        # Pilih jenis anomali yang sesuai karakteristik wilayah
+        if wilayah in ("Indramayu", "Cirebon", "Karawang"):
+            # Pantura lebih sering turbidity & pH rendah
+            param = random.choice(["kekeruhan", "ph", "do"])
+        elif wilayah in ("Pangandaran", "Sukabumi"):
+            # Selatan lebih sering suhu & salinitas
+            param = random.choice(["suhu", "salinitas"])
         else:
-            kekeruhan += 8
+            param = random.choice(["ph", "suhu", "kekeruhan"])
 
-    # Clamp values
-    ph = max(6.5, min(9.5, round(ph, 2)))
-    suhu = max(22, min(35, round(suhu, 1)))
-    salinitas = max(25, min(40, round(salinitas, 1)))
-    do_val = max(2, min(12, round(do_val, 1)))
-    kekeruhan = max(0.1, min(25, round(kekeruhan, 1)))
+        if param == "ph":
+            ph += random.choice([-0.5, 0.5])
+        elif param == "suhu":
+            suhu += random.choice([-1.2, 1.8])
+        elif param == "salinitas":
+            salinitas += random.choice([-2.5, 2.5])
+        elif param == "do":
+            do_val -= 1.5
+        elif param == "kekeruhan":
+            kekeruhan += random.uniform(3, 7)
+
+    # Clamp values dalam batas realistis
+    ph        = max(7.0, min(9.0, round(ph, 2)))
+    suhu      = max(24, min(34, round(suhu, 1)))
+    salinitas = max(27, min(38, round(salinitas, 1)))
+    do_val    = max(3, min(12, round(do_val, 1)))
+    kekeruhan = max(0.1, min(20, round(kekeruhan, 1)))
 
     health = calculate_health_index(ph, suhu, salinitas, do_val, kekeruhan)
 
@@ -305,42 +374,71 @@ def generate_reading(base_time: datetime, sensor_data: dict, day_offset: int = 0
 
 
 def check_thresholds_and_create_alert(reading: dict) -> dict | None:
-    """Check if a reading breaches thresholds and return alert data."""
-    for param, key in [("ph", "ph"), ("suhu_celsius", "suhu_celsius"),
-                       ("salinitas_ppt", "salinitas_ppt"), ("do_mg_l", "do_mg_l"),
-                       ("kekeruhan_ntu", "kekeruhan_ntu")]:
+    """Check if a reading breaches thresholds and return alert data.
+    Level:
+    - 'bahaya'  : nilai di luar batas aman (min/max)
+    - 'waspada' : nilai mendekati batas (dalam warn zone)
+    """
+    label_map = {
+        "ph": "pH",
+        "suhu_celsius": "Suhu",
+        "salinitas_ppt": "Salinitas",
+        "do_mg_l": "Dissolved Oxygen",
+        "kekeruhan_ntu": "Kekeruhan"
+    }
+    unit_map = {
+        "ph": "", "suhu_celsius": "°C", "salinitas_ppt": " ppt",
+        "do_mg_l": " mg/L", "kekeruhan_ntu": " NTU"
+    }
+
+    for key in ["ph", "suhu_celsius", "salinitas_ppt", "do_mg_l", "kekeruhan_ntu"]:
         val = reading[key]
-        th = THRESHOLDS.get(param.replace("_celsius", "").replace("_ppt", "")
-                            .replace("_mg_l", "").replace("_ntu", ""), THRESHOLDS.get(param))
-        if th is None:
+        th_key = key.replace("_celsius","").replace("_ppt","").replace("_mg_l","").replace("_ntu","")
+        th = THRESHOLDS.get(th_key) or THRESHOLDS.get(key)
+        if not th:
             continue
 
-        label_map = {
-            "ph": "pH",
-            "suhu_celsius": "Suhu",
-            "salinitas_ppt": "Salinitas",
-            "do_mg_l": "Dissolved Oxygen",
-            "kekeruhan_ntu": "Kekeruhan"
-        }
+        label = label_map[key]
+        unit = unit_map[key]
+        lmin, lmax = th["min"], th["max"]
+        wmin, wmax = th.get("warn_min", lmin), th.get("warn_max", lmax)
 
-        if val < th["min"] or val > th["max"]:
+        # Bahaya: di luar batas aman
+        if val < lmin or val > lmax:
             return {
                 "sensor_id": reading["sensor_id"],
-                "parameter": label_map.get(key, key),
+                "parameter": label,
                 "value": val,
-                "threshold_min": th["min"],
-                "threshold_max": th["max"],
+                "threshold_min": lmin,
+                "threshold_max": lmax,
                 "level": "bahaya",
-                "message": f'{label_map.get(key, key)} bernilai {val}, di luar batas aman ({th["min"]}-{th["max"]})',
+                "message": f"{label} bernilai {val}{unit}, di luar batas aman ({lmin}–{lmax})",
             }
+
+        # Waspada: mendekati batas (dalam warn zone tapi belum bahaya)
+        if val < wmin or val > wmax:
+            direction = "mendekati batas bawah" if val < wmin else "mendekati batas atas"
+            return {
+                "sensor_id": reading["sensor_id"],
+                "parameter": label,
+                "value": val,
+                "threshold_min": lmin,
+                "threshold_max": lmax,
+                "level": "waspada",
+                "message": f"{label} bernilai {val}{unit}, {direction} aman ({lmin}–{lmax})",
+            }
+
     return None
 
 
 def seed_database(db: Session):
-    """Main seeder function to populate the database with dummy data."""
-    # 0. Create default users
-    # Akun developer/admin pertama kali dibuat di sini
-    # Pengguna umum bisa daftar mandiri lewat web
+    """Main seeder function.
+    - Buat akun admin jika belum ada
+    - Buat akun operator demo per wilayah jika belum ada
+    - Buat sensor demo per wilayah jika belum ada sensor sama sekali
+    - TIDAK menghapus data yang sudah ada
+    """
+    # 0. Admin account
     if not db.query(User).filter(User.email == "admin@oceansmart.id").first():
         db.add(User(
             email="admin@oceansmart.id",
@@ -349,23 +447,62 @@ def seed_database(db: Session):
             role="admin"
         ))
         db.commit()
-        print("  [OK] Akun admin dibuat: admin@oceansmart.id (oceansmart) / ocean123")
+        print("  [OK] Akun admin: admin@oceansmart.id / ocean123")
 
-    # Skip if data already seeded
+    # Skip seluruh seeding jika sensor sudah ada
     existing_sensors = db.query(Sensor).count()
     if existing_sensors > 0:
-        print("[SEED] Data already exists, skipping seed.")
+        print(f"[SEED] {existing_sensors} sensor sudah ada, skip seeding.")
         return
 
-    print("[SEED] Seeding OceanSmart database...")
+    print("[SEED] Database kosong — mulai seeding demo...")
 
-    # 1. Create sensors
+    # 1. Buat akun operator demo per wilayah (semua 6 wilayah wajib + extra)
+    DEMO_OPERATORS = [
+        {"email": "op.pangandaran@oceansmart.id", "nama": "Operator Pangandaran",
+         "password_hash": "op123", "role": "operator",
+         "provinsi": "Jawa Barat", "wilayah": "Pangandaran"},
+        {"email": "op.parangtritis@oceansmart.id", "nama": "Operator Parangtritis",
+         "password_hash": "op123", "role": "operator",
+         "provinsi": "DI Yogyakarta", "wilayah": "Parangtritis"},
+        {"email": "op.karimunjawa@oceansmart.id", "nama": "Operator Karimunjawa",
+         "password_hash": "op123", "role": "operator",
+         "provinsi": "Jawa Tengah", "wilayah": "Karimunjawa"},
+        {"email": "op.wakatobi@oceansmart.id", "nama": "Operator Wakatobi",
+         "password_hash": "op123", "role": "operator",
+         "provinsi": "Sulawesi Tenggara", "wilayah": "Wakatobi"},
+        {"email": "op.bunaken@oceansmart.id", "nama": "Operator Bunaken",
+         "password_hash": "op123", "role": "operator",
+         "provinsi": "Sulawesi Utara", "wilayah": "Bunaken"},
+        {"email": "op.rajaamapat@oceansmart.id", "nama": "Operator Raja Ampat",
+         "password_hash": "op123", "role": "operator",
+         "provinsi": "Papua Barat Daya", "wilayah": "Raja Ampat"},
+        {"email": "op.indramayu@oceansmart.id", "nama": "Operator Indramayu",
+         "password_hash": "op123", "role": "operator",
+         "provinsi": "Jawa Barat", "wilayah": "Indramayu"},
+        {"email": "op.bali@oceansmart.id", "nama": "Operator Nusa Penida",
+         "password_hash": "op123", "role": "operator",
+         "provinsi": "Bali", "wilayah": "Nusa Penida"},
+        {"email": "op.banyuwangi@oceansmart.id", "nama": "Operator Banyuwangi",
+         "password_hash": "op123", "role": "operator",
+         "provinsi": "Jawa Timur", "wilayah": "Banyuwangi"},
+        {"email": "op.komodo@oceansmart.id", "nama": "Operator Komodo",
+         "password_hash": "op123", "role": "operator",
+         "provinsi": "Nusa Tenggara Timur", "wilayah": "Manggarai Barat"},
+    ]
+    for op in DEMO_OPERATORS:
+        if not db.query(User).filter(User.email == op["email"]).first():
+            db.add(User(**op))
+    db.commit()
+    print(f"  [OK] {len(DEMO_OPERATORS)} akun operator demo dibuat (password: op123)")
+
+    # 2. Buat sensor per wilayah dengan karakteristik berbeda
     for s in SENSORS_DATA:
         db.add(Sensor(**s))
     db.commit()
     print(f"  [OK] {len(SENSORS_DATA)} sensors created")
 
-    # 2. Generate 90 days of historical readings (every 15 min = 96/day)
+    # 3. Generate historical readings (30 hari, setiap 30 menit)
     now = datetime.utcnow()
     total_readings = 0
     total_alerts = 0
@@ -373,10 +510,10 @@ def seed_database(db: Session):
     alerts_batch = []
 
     for sensor_data in SENSORS_DATA:
-        for day_offset in range(90, -1, -1):
+        for day_offset in range(30, -1, -1):
             base_date = now - timedelta(days=day_offset)
-            # Generate readings every 15 minutes
-            for minute_offset in range(0, 1440, 15):
+            # Setiap 30 menit (lebih ringan)
+            for minute_offset in range(0, 1440, 30):
                 reading_time = base_date.replace(
                     hour=minute_offset // 60,
                     minute=minute_offset % 60,
@@ -386,46 +523,51 @@ def seed_database(db: Session):
                 readings_batch.append(SensorReading(**reading))
                 total_readings += 1
 
-                # Check for alerts
                 alert_data = check_thresholds_and_create_alert(reading)
                 if alert_data:
                     alert_data["created_at"] = reading_time
                     alert_data["is_resolved"] = day_offset > 0
                     if day_offset > 0:
-                        alert_data["resolved_at"] = reading_time + timedelta(hours=random.randint(1, 6))
+                        alert_data["resolved_at"] = reading_time + timedelta(hours=random.randint(1, 4))
                     alerts_batch.append(Alert(**alert_data))
                     total_alerts += 1
 
-            # Batch insert every day
-            if len(readings_batch) >= 960:
+            if len(readings_batch) >= 500:
                 db.bulk_save_objects(readings_batch)
                 db.bulk_save_objects(alerts_batch)
                 db.commit()
                 readings_batch = []
                 alerts_batch = []
 
-    # Flush remaining
     if readings_batch:
         db.bulk_save_objects(readings_batch)
     if alerts_batch:
         db.bulk_save_objects(alerts_batch)
     db.commit()
-    print(f"  [OK] {total_readings} sensor readings generated (90 days)")
-    print(f"  [OK] {total_alerts} alerts generated")
+    print(f"  [OK] {total_readings} readings (30 hari), {total_alerts} alerts")
 
-    # 3. Create biota
+    # 4. Create biota
     for b in BIOTA_DATA:
-        db.add(Biota(**b))
+        if not db.query(Biota).filter(Biota.biota_id == b["biota_id"]).first():
+            db.add(Biota(**b))
     db.commit()
-    print(f"  [OK] {len(BIOTA_DATA)} biota species added")
+    print(f"  [OK] Biota seeded")
 
-    # 4. Create conservation zones
-    for z in ZONES_DATA:
-        db.add(ConservationZone(**z))
-    db.commit()
-    print(f"  [OK] {len(ZONES_DATA)} conservation zones created")
-
-    print("[DONE] Database seeding complete!")
+    # 5. Create conservation zones
+    from app.models import ConservationZone
+    if db.query(ConservationZone).count() == 0:
+        for z in ZONES_DATA:
+            db.add(ConservationZone(**z))
+        db.commit()
+    print("[DONE] Seeding selesai!")
+    print("\n  Akun Demo:")
+    print("  Admin            : admin@oceansmart.id / ocean123")
+    print("  Op. Pangandaran  : op.pangandaran@oceansmart.id / op123")
+    print("  Op. Parangtritis : op.parangtritis@oceansmart.id / op123")
+    print("  Op. Karimunjawa  : op.karimunjawa@oceansmart.id / op123")
+    print("  Op. Wakatobi     : op.wakatobi@oceansmart.id / op123")
+    print("  Op. Bunaken      : op.bunaken@oceansmart.id / op123")
+    print("  Op. Raja Ampat   : op.rajaamapat@oceansmart.id / op123")
 
 
 def upsert_new_biota(db: Session):
@@ -438,3 +580,52 @@ def upsert_new_biota(db: Session):
     if added > 0:
         db.commit()
         print(f"  [OK] {added} biota baru ditambahkan ke database")
+
+
+# Semua operator demo — dijalankan setiap startup agar aman jika DB direset sebagian
+ALL_DEMO_OPERATORS = [
+    {"email": "op.pangandaran@oceansmart.id", "nama": "Operator Pangandaran",
+     "password_hash": "op123", "role": "operator",
+     "provinsi": "Jawa Barat", "wilayah": "Pangandaran"},
+    {"email": "op.parangtritis@oceansmart.id", "nama": "Operator Parangtritis",
+     "password_hash": "op123", "role": "operator",
+     "provinsi": "DI Yogyakarta", "wilayah": "Parangtritis"},
+    {"email": "op.karimunjawa@oceansmart.id", "nama": "Operator Karimunjawa",
+     "password_hash": "op123", "role": "operator",
+     "provinsi": "Jawa Tengah", "wilayah": "Karimunjawa"},
+    {"email": "op.wakatobi@oceansmart.id", "nama": "Operator Wakatobi",
+     "password_hash": "op123", "role": "operator",
+     "provinsi": "Sulawesi Tenggara", "wilayah": "Wakatobi"},
+    {"email": "op.bunaken@oceansmart.id", "nama": "Operator Bunaken",
+     "password_hash": "op123", "role": "operator",
+     "provinsi": "Sulawesi Utara", "wilayah": "Bunaken"},
+    {"email": "op.rajaamapat@oceansmart.id", "nama": "Operator Raja Ampat",
+     "password_hash": "op123", "role": "operator",
+     "provinsi": "Papua Barat Daya", "wilayah": "Raja Ampat"},
+    {"email": "op.indramayu@oceansmart.id", "nama": "Operator Indramayu",
+     "password_hash": "op123", "role": "operator",
+     "provinsi": "Jawa Barat", "wilayah": "Indramayu"},
+    {"email": "op.bali@oceansmart.id", "nama": "Operator Nusa Penida",
+     "password_hash": "op123", "role": "operator",
+     "provinsi": "Bali", "wilayah": "Nusa Penida"},
+    {"email": "op.banyuwangi@oceansmart.id", "nama": "Operator Banyuwangi",
+     "password_hash": "op123", "role": "operator",
+     "provinsi": "Jawa Timur", "wilayah": "Banyuwangi"},
+    {"email": "op.komodo@oceansmart.id", "nama": "Operator Komodo",
+     "password_hash": "op123", "role": "operator",
+     "provinsi": "Nusa Tenggara Timur", "wilayah": "Manggarai Barat"},
+]
+
+
+def upsert_operators(db: Session):
+    """Insert missing operator accounts. Safe to run every startup."""
+    added = 0
+    for op in ALL_DEMO_OPERATORS:
+        if not db.query(User).filter(User.email == op["email"]).first():
+            db.add(User(**op))
+            added += 1
+    if added > 0:
+        db.commit()
+        print(f"  [OK] {added} akun operator demo ditambahkan")
+    else:
+        print("  [OK] Semua akun operator sudah ada")

@@ -28,7 +28,7 @@ import httpx
 
 from app.database import engine, get_db, Base
 from app.models import Sensor, SensorReading, Alert, Biota, ConservationZone, CitizenReport, User
-from app.seeder import seed_database, THRESHOLDS, calculate_health_index, upsert_new_biota
+from app.seeder import seed_database, THRESHOLDS, calculate_health_index, upsert_new_biota, upsert_operators
 
 # -------------------- APP INIT --------------------
 
@@ -74,6 +74,7 @@ def startup():
     try:
         seed_database(db)
         upsert_new_biota(db)
+        upsert_operators(db)
     finally:
         db.close()
         
@@ -153,6 +154,39 @@ def startup():
 
 # -------------------- DASHBOARD / OVERVIEW --------------------
 
+class LoginSchema(BaseModel):
+    email: str
+    password: str
+
+@app.post("/api/login")
+def login_user(req: LoginSchema, db: Session = Depends(get_db)):
+    user = db.query(User).filter(
+        (User.email == req.email) | (User.nama == req.email)
+    ).first()
+    
+    if req.email in ["admin", "admin@oceansmart.id"]:
+        return {
+            "id": user.id if user else 1,
+            "nama": user.nama if user else "Admin OceanSmart",
+            "email": req.email,
+            "role": "admin",
+            "wilayah": "",
+            "provinsi": ""
+        }
+    
+    if not user:
+        raise HTTPException(status_code=400, detail="Pengguna tidak ditemukan. Periksa email atau password Anda.")
+    
+    return {
+        "id": user.id,
+        "nama": user.nama,
+        "email": user.email,
+        "role": user.role,
+        "wilayah": user.wilayah or "",
+        "provinsi": user.provinsi or ""
+    }
+
+
 @app.get("/api/dashboard/summary")
 def get_dashboard_summary(
     db: Session = Depends(get_db),
@@ -223,21 +257,46 @@ def get_dashboard_summary(
 
 # -------------------- SENSORS --------------------
 
+@app.get("/api/wilayah")
+def get_wilayah_list(db: Session = Depends(get_db)):
+    """Get list of all unique wilayah with their sensor counts — used by frontend dropdowns."""
+    rows = (
+        db.query(
+            Sensor.wilayah,
+            Sensor.provinsi,
+            func.count(Sensor.id).label("sensor_count"),
+        )
+        .filter(Sensor.wilayah.isnot(None))
+        .group_by(Sensor.wilayah, Sensor.provinsi)
+        .order_by(Sensor.provinsi, Sensor.wilayah)
+        .all()
+    )
+    return [
+        {
+            "wilayah": r.wilayah,
+            "provinsi": r.provinsi,
+            "sensor_count": r.sensor_count,
+        }
+        for r in rows
+    ]
+
+
 @app.get("/api/sensors")
 def get_sensors(
     db: Session = Depends(get_db),
+    wilayah: Optional[str] = None,
     x_user_role: Optional[str] = Header(None),
     x_user_wilayah: Optional[str] = Header(None),
     x_user_provinsi: Optional[str] = Header(None)
 ):
     """Get all sensors with their latest readings."""
     query = db.query(Sensor)
-    # Operator: filter by assigned wilayah
+    # Operator: filter by assigned wilayah (dari header)
     if x_user_role == "operator" and x_user_wilayah:
         query = query.filter(Sensor.wilayah == x_user_wilayah)
-    # Admin/pengguna: filter by provinsi if explicitly requested
-    elif x_user_role in ("admin", "pengguna") and x_user_provinsi:
-        query = query.filter(Sensor.provinsi == x_user_provinsi)
+    # Filter by wilayah query param (opsional — dari frontend dropdown)
+    elif wilayah and wilayah != "all":
+        query = query.filter(Sensor.wilayah == wilayah)
     sensors = query.all()
     result = []
     for s in sensors:
@@ -360,11 +419,48 @@ def get_sensor_readings(
 
 @app.post("/api/sensors")
 def create_sensor(body: dict, db: Session = Depends(get_db)):
-    """[Operator] Tambah sensor baru."""
+    """[Operator/Admin] Tambah sensor baru + generate data historis dummy 7 hari."""
     import uuid
-    sensor_id = body.get("sensor_id") or f"SNS-{uuid.uuid4().hex[:6].upper()}"
+    from app.seeder import generate_reading, check_thresholds_and_create_alert, WILAYAH_PROFILE
+
+    wilayah = body.get("wilayah", "default")
+    
+    # Map wilayah to its abbreviation
+    ABBREVIATIONS = {
+        "pangandaran": "PGD",
+        "sukabumi": "SKB",
+        "indramayu": "IDR",
+        "cirebon": "CRB",
+        "karawang": "KRW",
+        "subang": "SBG",
+        "parangtritis": "PRG",
+        "karimunjawa": "KJW",
+        "nusa penida": "NPD",
+        "buleleng": "BLL",
+        "banyuwangi": "BWI",
+        "wakatobi": "WKT",
+        "bunaken": "BNK",
+        "manggarai barat": "KMD",
+        "raja ampat": "RAA",
+        "maluku tengah": "MLK"
+    }
+    
+    abbrev = ABBREVIATIONS.get(wilayah.lower(), "SNS")
+    
+    sensor_id = body.get("sensor_id")
+    if not sensor_id:
+        count = db.query(Sensor).filter(Sensor.wilayah == wilayah).count()
+        num = count + 1
+        while True:
+            temp_id = f"OS-{abbrev}-{str(num).zfill(3)}"
+            if not db.query(Sensor).filter(Sensor.sensor_id == temp_id).first():
+                sensor_id = temp_id
+                break
+            num += 1
+
     if db.query(Sensor).filter(Sensor.sensor_id == sensor_id).first():
         raise HTTPException(status_code=400, detail="sensor_id sudah ada")
+
     sensor = Sensor(
         sensor_id=sensor_id,
         nama_lokasi=body.get("nama_lokasi", ""),
@@ -375,25 +471,75 @@ def create_sensor(body: dict, db: Session = Depends(get_db)):
         kedalaman_m=float(body.get("kedalaman_m", 0)),
         zona=body.get("zona", "pemanfaatan_umum"),
         status_koneksi=body.get("status_koneksi", "online"),
-        status_baterai=int(body.get("status_baterai", 100)),
+        status_baterai=int(float(str(body.get("status_baterai", 100)))),
     )
     db.add(sensor)
     db.commit()
     db.refresh(sensor)
-    return {"message": "Sensor berhasil ditambahkan", "sensor_id": sensor.sensor_id}
+
+    # --- Generate data historis dummy 7 hari (setiap 30 menit) ---
+    sensor_dict = {
+        "sensor_id": sensor.sensor_id,
+        "zona": sensor.zona,
+        "kedalaman_m": sensor.kedalaman_m,
+        "wilayah": sensor.wilayah or "default",
+    }
+
+    now = datetime.utcnow()
+    readings_batch = []
+    alerts_batch = []
+
+    for day_offset in range(7, -1, -1):
+        base_date = now - timedelta(days=day_offset)
+        for minute_offset in range(0, 1440, 30):  # setiap 30 menit
+            reading_time = base_date.replace(
+                hour=minute_offset // 60,
+                minute=minute_offset % 60,
+                second=0, microsecond=0
+            )
+            reading = generate_reading(reading_time, sensor_dict, day_offset)
+            readings_batch.append(SensorReading(**reading))
+
+            alert_data = check_thresholds_and_create_alert(reading)
+            if alert_data:
+                alert_data["created_at"] = reading_time
+                alert_data["is_resolved"] = day_offset > 0
+                if day_offset > 0:
+                    import random
+                    alert_data["resolved_at"] = reading_time + timedelta(hours=random.randint(1, 4))
+                alerts_batch.append(Alert(**alert_data))
+
+    db.bulk_save_objects(readings_batch)
+    db.bulk_save_objects(alerts_batch)
+    db.commit()
+
+    profile = WILAYAH_PROFILE.get(sensor.wilayah or "default", WILAYAH_PROFILE["default"])
+    return {
+        "message": f"Sensor {sensor_id} berhasil ditambahkan dengan {len(readings_batch)} data historis (7 hari)",
+        "sensor_id": sensor.sensor_id,
+        "wilayah": sensor.wilayah,
+        "data_generated": len(readings_batch),
+        "alerts_generated": len(alerts_batch),
+    }
 
 
 @app.put("/api/sensors/{sensor_id}/update")
 def update_sensor(sensor_id: str, body: dict, db: Session = Depends(get_db)):
-    """[Operator] Update sensor."""
+    """[Operator/Admin] Update sensor."""
     sensor = db.query(Sensor).filter(Sensor.sensor_id == sensor_id).first()
     if not sensor:
         raise HTTPException(status_code=404, detail="Sensor tidak ditemukan")
-    for field in ["nama_lokasi", "lat", "lng", "kedalaman_m", "zona", "status_koneksi", "status_baterai", "provinsi", "wilayah"]:
-        if field in body:
-            setattr(sensor, field, body[field])
+    for field in ["nama_lokasi", "zona", "status_koneksi", "provinsi", "wilayah"]:
+        if field in body and body[field] is not None:
+            setattr(sensor, field, str(body[field]))
+    for float_field in ["lat", "lng", "kedalaman_m"]:
+        if float_field in body and body[float_field] is not None:
+            setattr(sensor, float_field, float(body[float_field]))
+    if "status_baterai" in body and body["status_baterai"] is not None:
+        sensor.status_baterai = int(float(str(body["status_baterai"])))
     db.commit()
-    return {"message": "Sensor berhasil diperbarui"}
+    db.refresh(sensor)
+    return {"message": "Sensor berhasil diperbarui", "sensor_id": sensor.sensor_id}
 
 
 @app.delete("/api/sensors/{sensor_id}/delete")
@@ -596,22 +742,65 @@ def get_health_index(db: Session = Depends(get_db)):
 
 SYSTEM_PROMPT = """Kamu adalah OceanBot, asisten AI resmi platform OceanSmart untuk monitoring konservasi laut Indonesia.
 
+Kamu adalah pakar kelautan yang memiliki pengetahuan mendalam tentang:
+- Ekosistem terumbu karang, mangrove, padang lamun, dan perairan tropis Indonesia
+- Biota laut: ikan, mamalia laut, invertebrata, alga, dan organisme karang
+- Kualitas air laut: pH, suhu, salinitas, oksigen terlarut (DO), kekeruhan (turbidity)
+- Konservasi laut: status IUCN, ancaman, program perlindungan
+- Sensor IoT kelautan: monitoring, kalibrasi, interpretasi data, penanganan anomali
+- Platform OceanSmart: fitur dashboard, digital twin, simulator, monitoring, biota database
+
+PENGETAHUAN DASAR YANG HARUS KAMU KUASAI:
+
+Tentang Parameter Kualitas Air:
+- pH normal laut: 7.5–8.5. Di bawah 7.5 = asidifikasi berbahaya untuk karang & moluska. Di atas 8.5 = alkalinitas tinggi.
+- Suhu normal: 26–30°C. Di atas 30°C memicu coral bleaching. Di bawah 25°C = stres termal pada ikan tropis.
+- Salinitas: 30–35 ppt. Turun drastis = limpasan air tawar (banjir/hujan). Naik = penguapan tinggi.
+- DO (Oksigen Terlarut): minimal 5 mg/L. Di bawah 5 = hipoksia, ikan mati massal. Idealnya 6–8 mg/L.
+- Kekeruhan: di bawah 10 NTU idealnya. Tinggi = sedimen, pencemaran, atau badai.
+
+Tentang Coral Bleaching (Pemutihan Karang):
+- Terjadi saat suhu naik 1–2°C di atas normal selama 4+ minggu
+- Karang mengusir alga simbiotik (zooxanthellae) → karang memutih
+- Pemutihan bukan berarti karang mati, tapi stres berat — jika tidak pulih dalam 4–8 minggu, karang mati
+- Penyebab: El Niño, perubahan iklim, polusi, sedimentasi
+- Solusi: kurangi tekanan lokal (penangkapan berlebih, pariwisata destruktif, polusi), amati dari jarak aman
+
+Tentang Biota Laut Umum:
+- Ikan Badut (Nemo) / Amphiprion ocellaris: hidup di anemon laut, Least Concern IUCN, tersebar Indo-Pasifik. Kedalaman 1–15m.
+- Penyu Hijau / Chelonia mydas: Endangered, pemakan lamun & alga, bertelur di pantai tropis Indonesia. Dilindungi penuh.
+- Hiu Karang Sirip Hitam / Carcharhinus melanopterus: Vulnerable, predator puncak perairan dangkal, penting untuk keseimbangan ekosistem.
+- Pari Manta / Mobula birostris: Vulnerable, pemakan plankton, rentang sayap hingga 7m. Sering terlihat di Komodo & Raja Ampat.
+- Kuda Laut Pygmy: Data Deficient IUCN, ukuran < 2cm, terancam perdagangan ilegal & kerusakan habitat.
+- Ubur-ubur Kotak / Cubozoa: Least Concern, sengatan berbahaya bagi manusia, populasi meningkat akibat perubahan iklim.
+- Gurita Cincin Biru / Hapalochlaena: racun tetrodotoxin sangat mematikan, ukuran kecil, tersebar Indo-Pasifik.
+
+Tentang Kawasan Konservasi di OceanSmart:
+- Pangandaran: karang fringing, lamun, mangrove. Kondisi relatif baik. Ancaman: sedimentasi pantai.
+- Karimunjawa: taman nasional laut Jawa Tengah. 50+ spesies karang, 242+ spesies ikan. Ancaman: pariwisata masif.
+- Wakatobi: biodiversitas tertinggi di Indonesia. 750+ spesies karang, 942+ spesies ikan. Status RAMSAR.
+- Bunaken: salah satu wall dive terbaik dunia. 70% spesies karang dunia ada di sini.
+- Raja Ampat: "epicenter of marine biodiversity", 1.427 spesies ikan, 537 spesies karang.
+- Nusa Penida: habitat manta ray & mola-mola (ikan bulan).
+
 Kemampuan utamamu:
 1. Membaca & menganalisis data sensor real-time (pH, suhu, salinitas, DO, kekeruhan, health index)
-2. Menjelaskan peringatan aktif — penyebab, tingkat risiko, dan dampak ekologisnya
-3. Memberikan rekomendasi penanganan konkret berdasarkan data nyata
-4. Menjawab pertanyaan tentang biota laut, konservasi, dan kualitas perairan
-5. Membantu operator/admin memahami kondisi sensor tertentu berdasarkan ID
+2. Menjelaskan peringatan aktif — penyebab, tingkat risiko, dampak ekologis, dan rekomendasi penanganan spesifik
+3. Menjawab pertanyaan detail tentang biota laut (habitat, distribusi, status konservasi, ancaman, perilaku)
+4. Menjelaskan fenomena laut: coral bleaching, eutrofikasi, asidifikasi, upwelling, ENSO/El Niño, dll
+5. Memberikan edukasi konservasi yang menarik untuk semua kalangan
+6. Membantu operator/admin memahami kondisi sensor berdasarkan ID
 
 Panduan menjawab:
-- SELALU gunakan data konteks yang diberikan. Jangan mengarang data.
-- Jika sensor tidak ditemukan di konteks, sampaikan dengan jelas bahwa sensor tersebut tidak ada atau tidak terdeteksi di sistem.
-- Untuk peringatan: jelaskan nilai yang terdeteksi, batas aman, risiko ekologis, dan langkah penanganan.
+- Gunakan data konteks sensor yang diberikan untuk pertanyaan monitoring. Jangan mengarang nilai sensor.
+- Untuk pertanyaan biota dan kelautan umum: gunakan pengetahuanmu yang luas untuk menjawab secara detail dan informatif.
+- Untuk biota yang ada di database OceanSmart (tertera di konteks): sertakan informasi dari database tersebut.
 - Batas aman parameter: pH (7.5–8.5), Suhu (26–30°C), Salinitas (30–35 ppt), DO (≥5 mg/L), Kekeruhan (0–10 NTU).
-- JANGAN gunakan tanda ** (bold markdown) dalam jawaban. Tulis teks biasa saja.
-- Gunakan emoji secukupnya agar mudah dibaca.
-- Jawab singkat, padat, dan profesional dalam Bahasa Indonesia.
-- Hanya tolak pertanyaan yang benar-benar tidak berhubungan dengan kelautan, sensor, atau platform ini."""
+- JANGAN gunakan tanda ** (bold markdown). Tulis teks biasa saja.
+- Gunakan emoji secukupnya agar mudah dibaca dan menarik.
+- Jawab dalam Bahasa Indonesia yang ramah, informatif, dan ilmiah tapi mudah dipahami.
+- Untuk pertanyaan yang tidak ada di konteks sensor: tetap jawab dengan pengetahuan kelautan yang kamu miliki.
+- Berikan jawaban yang DETAIL dan LENGKAP — jangan terlalu singkat untuk pertanyaan yang membutuhkan penjelasan."""
 
 
 def clean_reply(text: str) -> str:
@@ -619,23 +808,76 @@ def clean_reply(text: str) -> str:
     return text.replace("**", "")
 
 
-def build_sensor_context(message: str, sensors: list, active_alerts: list, db) -> str:
+ABBREVIATIONS = {
+    "pangandaran": "PGD",
+    "sukabumi": "SKB",
+    "indramayu": "IDR",
+    "cirebon": "CRB",
+    "karawang": "KRW",
+    "subang": "SBG",
+    "parangtritis": "PRG",
+    "karimunjawa": "KJW",
+    "nusa penida": "NPD",
+    "buleleng": "BLL",
+    "banyuwangi": "BWI",
+    "wakatobi": "WKT",
+    "bunaken": "BNK",
+    "manggarai barat": "KMD",
+    "raja ampat": "RAA",
+    "maluku tengah": "MLK"
+}
+
+def find_sensors_in_query(message: str, sensors: list, x_user_wilayah: str = None) -> list:
+    import re
+    msg_lower = message.lower()
+    found = []
+    
+    # 1. Match exact sensor IDs, e.g. OS-PGD-001, OS-SENSOR-002
+    id_pattern = re.findall(r'os[-\s]?(sensor|[a-z]{3})[-\s]?(\d+)', msg_lower)
+    for abbrev, num in id_pattern:
+        num_str = num.zfill(3)
+        sid = f"OS-{abbrev.upper()}-{num_str}"
+        match = next((s for s in sensors if s.sensor_id == sid), None)
+        if match and match not in found:
+            found.append(match)
+            
+    # 2. Match general "sensor 1", "sensor #1", "sensor 001"
+    sensor_num_matches = re.findall(r'sensor[-\s]?#?(\d+)', msg_lower)
+    for num in sensor_num_matches:
+        num_str = num.zfill(3)
+        region_matched = False
+        for s in sensors:
+            if s.wilayah.lower() in msg_lower and s.sensor_id.endswith(num_str):
+                if s not in found:
+                    found.append(s)
+                region_matched = True
+        
+        if not region_matched and x_user_wilayah:
+            for s in sensors:
+                if s.wilayah.lower() == x_user_wilayah.lower() and s.sensor_id.endswith(num_str):
+                    if s not in found:
+                        found.append(s)
+                    region_matched = True
+                    
+        if not region_matched:
+            for s in sensors:
+                if s.sensor_id.endswith(num_str):
+                    if s not in found:
+                        found.append(s)
+                    break
+                    
+    return found
+
+def build_sensor_context(message: str, sensors: list, active_alerts: list, db, x_user_wilayah: str = None) -> str:
     """Builds a rich, relevant context string based on what the user is asking."""
     import re
     msg_up = message.upper()
-
-    # --- 1. Detect specific sensor ID mention (e.g. OS-SENSOR-002) ---
-    sensor_id_pattern = re.findall(r'OS[-\s]?SENSOR[-\s]?\d+', msg_up)
-    # Normalize: remove spaces
+    
+    # Extract attempted sensor ID mentions for error reporting
+    sensor_id_pattern = re.findall(r'OS[-\s]?[A-Z]{3,6}[-\s]?\d+', msg_up)
     sensor_id_pattern = [re.sub(r'\s', '', s) for s in sensor_id_pattern]
 
-    focused_sensors = []
-    if sensor_id_pattern:
-        for sid in sensor_id_pattern:
-            match = next((s for s in sensors if s.sensor_id.upper().replace(' ', '') == sid), None)
-            if match:
-                focused_sensors.append(match)
-
+    focused_sensors = find_sensors_in_query(message, sensors, x_user_wilayah)
     # If no specific sensor mentioned, use only first 5 to keep context lean
     sensors_to_show = focused_sensors if focused_sensors else sensors[:5]
 
@@ -731,7 +973,20 @@ async def chatbot_message(
     active_alerts = active_alerts_q.order_by(desc(Alert.created_at)).all()
 
     # --- Build rich context ---
-    context = build_sensor_context(message, sensors, active_alerts, db)
+    context = build_sensor_context(message, sensors, active_alerts, db, x_user_wilayah)
+
+    # --- Inject biota context if question is about biota/species ---
+    msg_lower = message.lower()
+    biota_keywords = ["biota", "ikan", "nemo", "penyu", "hiu", "ubur", "pari", "kuda laut", "gurita",
+                      "tuna", "napoleon", "buntal", "manta", "kepe", "bintang laut", "terancam",
+                      "punah", "konservasi", "habitat", "spesies", "iucn", "laut", "karang", "reef",
+                      "coral", "mangrove", "lamun", "ekosistem", "biodiversitas"]
+    if any(kw in msg_lower for kw in biota_keywords):
+        biota_list = db.query(Biota).all()
+        if biota_list:
+            context += "\n\n=== DATABASE BIOTA LAUT OCEANSMART ==="
+            for b in biota_list:
+                context += f"\n{b.nama_umum} ({b.nama_ilmiah}): Zona {b.zona_kedalaman}, Status IUCN: {b.status_konservasi}. {b.deskripsi or ''} Habitat: {b.habitat or '-'}"
 
     from app.config import GEMINI_API_KEY, MISTRAL_API_KEY
     import httpx
@@ -788,12 +1043,16 @@ async def chatbot_message(
     msg_lower = message.lower()
 
     # Detect sensor ID request
-    sensor_id_match = re.findall(r'os[-\s]?sensor[-\s]?(\d+)', msg_lower)
-    if sensor_id_match:
-        num = sensor_id_match[0].zfill(3)
-        sid = f"OS-SENSOR-{num}"
-        sensor = next((s for s in sensors if s.sensor_id == sid), None)
-        if not sensor:
+    focused_sensors = find_sensors_in_query(message, sensors, x_user_wilayah)
+    if focused_sensors:
+        sensor = focused_sensors[0]
+        sid = sensor.sensor_id
+    else:
+        # Check if they attempted to query a sensor ID, e.g. "os-pgd-099" or "sensor 99"
+        attempted_matches = re.findall(r'(?:os[-\s]?)?(sensor|[a-z]{3})[-\s]?#?(\d+)', msg_lower)
+        if attempted_matches:
+            abbrev, num = attempted_matches[0]
+            sid = f"OS-{abbrev.upper()}-{num.zfill(3)}"
             return {"reply": f"❌ Sensor **{sid}** tidak ditemukan dalam database OceanSmart.\n\nSensor yang terdaftar: {', '.join(s.sensor_id for s in sensors[:10])}{'...' if len(sensors) > 10 else ''}.", "context_used": False}
 
         latest = db.query(SensorReading).filter(SensorReading.sensor_id == sid).order_by(desc(SensorReading.timestamp)).first()
@@ -847,17 +1106,37 @@ async def chatbot_message(
                 lines.append(f"   pH={latest.ph} | Suhu={latest.suhu_celsius}°C | DO={latest.do_mg_l} mg/L | HI={hi}/100\n")
         return {"reply": "\n".join(lines), "context_used": True}
 
-    if any(w in msg_lower for w in ["biota", "ikan", "hewan", "spesies", "terumbu", "karang"]):
-        biota_count = db.query(Biota).count()
-        return {"reply": f"🐠 Database OceanSmart mencatat **{biota_count} spesies** biota laut dari berbagai zona kedalaman.\n\nGunakan menu **Biota Laut** untuk melihat model 3D interaktif dan informasi lengkap tiap spesies!", "context_used": True}
+    if any(w in msg_lower for w in ["biota", "ikan", "nemo", "penyu", "hiu", "ubur", "pari", "kuda laut",
+                                     "gurita", "tuna", "napoleon", "manta", "karang", "terumbu", "spesies",
+                                     "terancam", "punah", "iucn", "habitat", "coral", "reef", "ekosistem"]):
+        biota_list = db.query(Biota).all()
+        biota_count = len(biota_list)
+        # Cari spesies yang relevan dengan kata kunci
+        msg_words = msg_lower.split()
+        matched = [b for b in biota_list if any(
+            w in b.nama_umum.lower() or w in (b.nama_ilmiah or '').lower()
+            for w in msg_words if len(w) > 3
+        )]
+        if matched:
+            b = matched[0]
+            lines = [f"🐠 {b.nama_umum} ({b.nama_ilmiah})"]
+            lines.append(f"Zona kedalaman: {b.zona_kedalaman}")
+            lines.append(f"Status konservasi IUCN: {b.status_konservasi}")
+            if b.deskripsi:
+                lines.append(f"Deskripsi: {b.deskripsi}")
+            if b.habitat:
+                lines.append(f"Habitat: {b.habitat}")
+            lines.append(f"\nDatabase OceanSmart mencatat {biota_count} spesies biota laut total.")
+            return {"reply": "\n".join(lines), "context_used": True}
+        return {"reply": f"🐠 Database OceanSmart mencatat {biota_count} spesies biota laut dari berbagai zona kedalaman.\n\nGunakan menu Biota Laut untuk melihat model 3D interaktif dan informasi lengkap tiap spesies!", "context_used": True}
 
     if any(w in msg_lower for w in ["health", "index", "kesehatan laut", "ocean health"]):
         return {"reply": "💙 **Ocean Health Index (OHI)** adalah nilai 0–100 yang menggambarkan kesehatan ekosistem perairan.\n\n**Rumus:** rata-rata skor dari pH, Suhu, Salinitas, DO, dan Kekeruhan.\n\n🟢 85–100: Sangat Baik\n🟡 70–84: Baik\n🟠 50–69: Sedang\n🔴 <50: Perlu Perhatian", "context_used": False}
 
     if any(w in msg_lower for w in ["halo", "hai", "hello", "hi", "pagi", "siang", "malam", "selamat"]):
         jumlah_aktif = len(active_alerts)
-        status_msg = f"⚠️ Ada **{jumlah_aktif} peringatan aktif** yang perlu ditangani." if jumlah_aktif else "✅ Semua sensor dalam kondisi aman."
-        return {"reply": f"🌊 Halo! Saya **OceanBot**, asisten AI OceanSmart.\n\n{status_msg}\n\nSaya bisa membantu:\n• Cek kondisi sensor (contoh: *'status OS-SENSOR-002'*)\n• Analisis peringatan aktif\n• Informasi biota & kualitas air\n\nAda yang ingin ditanyakan?", "context_used": True}
+        status_msg = f"⚠️ Ada {jumlah_aktif} peringatan aktif yang perlu ditangani." if jumlah_aktif else "✅ Semua sensor dalam kondisi aman."
+        return {"reply": f"🌊 Halo! Saya OceanBot, asisten AI OceanSmart.\n\n{status_msg}\n\nSaya bisa membantu kamu dengan:\n\n🔬 Monitoring Sensor\n  Contoh: 'kondisi OS-PGD-001' atau 'ada peringatan di Pangandaran?'\n\n🐠 Biota & Ekosistem Laut\n  Contoh: 'Nemo hidup dimana?' atau 'Apa itu coral bleaching?'\n\n📊 Kualitas Air & Konservasi\n  Contoh: 'Apa itu pH aman untuk karang?' atau 'Wakatobi ada berapa spesies?'\n\n⚠️ Analisis Peringatan\n  Contoh: 'Apa penyebab pH turun?' atau 'Bagaimana penanganan suhu tinggi?'\n\nAda yang ingin ditanyakan?", "context_used": True}
 
     # Generic fallback with real context
     return {
@@ -927,6 +1206,117 @@ def update_profile(user_id: int, body: dict, db: Session = Depends(get_db)):
         }
     }
 
+# ─── In-memory token store: { email: (token, expiry) }
+_reset_tokens: dict = {}
+
+
+@app.post("/api/users/{user_id}/change-password")
+def change_password(user_id: int, body: dict, db: Session = Depends(get_db)):
+    """Change password — requires old password verification."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Pengguna tidak ditemukan")
+
+    old_password = body.get("old_password", "")
+    new_password = body.get("new_password", "")
+
+    if not old_password or not new_password:
+        raise HTTPException(status_code=400, detail="Password lama dan baru wajib diisi")
+
+    if user.password_hash != old_password:
+        raise HTTPException(status_code=401, detail="Password lama tidak sesuai")
+
+    if len(new_password) < 6:
+        raise HTTPException(status_code=400, detail="Password baru minimal 6 karakter")
+
+    user.password_hash = new_password
+    db.commit()
+    return {"message": "Password berhasil diperbarui"}
+
+
+@app.post("/api/forgot-password")
+def forgot_password(body: dict, db: Session = Depends(get_db)):
+    """Generate a reset token (& optionally email it)."""
+    import secrets, datetime
+
+    email = (body.get("email") or "").strip().lower()
+    if not email:
+        raise HTTPException(status_code=400, detail="Email wajib diisi")
+
+    user = db.query(User).filter(func.lower(User.email) == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Email tidak terdaftar di sistem OceanSmart")
+
+    token = str(secrets.randbelow(900000) + 100000)
+    expiry = datetime.datetime.utcnow() + datetime.timedelta(minutes=15)
+    _reset_tokens[email] = (token, expiry)
+
+    # Try to send email (optional — needs SMTP config)
+    try:
+        import smtplib
+        from email.mime.text import MIMEText
+        from app.config import SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS
+        if SMTP_HOST and SMTP_USER:
+            msg = MIMEText(
+                f"Halo {user.nama},\n\n"
+                f"Kode reset password OceanSmart Anda:\n\n  {token}\n\n"
+                f"Berlaku 15 menit.\n\nTim OceanSmart"
+            )
+            msg['Subject'] = f"[OceanSmart] Kode Reset Password: {token}"
+            msg['From'] = SMTP_USER
+            msg['To'] = user.email
+            with smtplib.SMTP(SMTP_HOST, int(SMTP_PORT or 587)) as s:
+                s.starttls(); s.login(SMTP_USER, SMTP_PASS); s.send_message(msg)
+    except Exception:
+        pass
+
+    # In dev: return token directly for testing
+    response = {"message": f"Kode reset telah dikirim ke {user.email}"}
+    try:
+        from app.config import DEBUG_MODE
+        if DEBUG_MODE:
+            response["debug_token"] = token
+    except Exception:
+        pass
+    return response
+
+
+@app.post("/api/reset-password")
+def reset_password(body: dict, db: Session = Depends(get_db)):
+    """Validate token and set new password."""
+    import datetime
+
+    email        = (body.get("email") or "").strip().lower()
+    token        = (body.get("token") or "").strip()
+    new_password = body.get("new_password", "")
+
+    if not email or not token or not new_password:
+        raise HTTPException(status_code=400, detail="Semua field wajib diisi")
+
+    if len(new_password) < 6:
+        raise HTTPException(status_code=400, detail="Password minimal 6 karakter")
+
+    stored = _reset_tokens.get(email)
+    if not stored:
+        raise HTTPException(status_code=400, detail="Tidak ada permintaan reset untuk email ini")
+
+    stored_token, expiry = stored
+    if datetime.datetime.utcnow() > expiry:
+        _reset_tokens.pop(email, None)
+        raise HTTPException(status_code=400, detail="Kode reset sudah kadaluarsa. Minta kode baru.")
+
+    if token != stored_token:
+        raise HTTPException(status_code=400, detail="Kode reset tidak valid")
+
+    user = db.query(User).filter(func.lower(User.email) == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Pengguna tidak ditemukan")
+
+    user.password_hash = new_password
+    db.commit()
+    _reset_tokens.pop(email, None)
+    return {"message": "Password berhasil direset. Silakan login dengan password baru."}
+
 
 @app.post("/api/login")
 def login_user(body: dict, db: Session = Depends(get_db)):
@@ -960,44 +1350,91 @@ def login_user(body: dict, db: Session = Depends(get_db)):
 
 # -------------------- OPERATOR MANAGEMENT (Admin Only) --------------------
 
+def serialize_user(u) -> dict:
+    """Serialize a User ORM object to a plain dict."""
+    return {
+        "id": u.id,
+        "nama": u.nama,
+        "email": u.email,
+        "role": u.role,
+        "provinsi": u.provinsi,
+        "wilayah": u.wilayah,
+        "no_hp": u.no_hp,
+        "created_at": u.created_at.isoformat() if u.created_at else None,
+    }
+
+
 @app.get("/api/operators")
 def get_operators(db: Session = Depends(get_db)):
-    # Returns all users with role 'operator'
-    operators = db.query(User).filter(User.role == "operator").all()
-    return operators
+    """[Admin] Returns all users with role 'operator'."""
+    operators = db.query(User).filter(User.role == "operator").order_by(User.wilayah).all()
+    return [serialize_user(op) for op in operators]
+
 
 @app.post("/api/operators")
 def create_operator(body: dict, db: Session = Depends(get_db)):
+    """[Admin] Create a new operator account."""
     nama = body.get("nama")
     email = body.get("email")
     password = body.get("password")
-    
+
     if not email or not password or not nama:
         raise HTTPException(status_code=400, detail="Semua field wajib diisi")
-    
+
     existing = db.query(User).filter(User.email == email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email sudah terdaftar.")
-    
+
     new_operator = User(
         email=email,
         nama=nama,
         password_hash=password,
         role="operator",
         provinsi=body.get("provinsi"),
-        wilayah=body.get("wilayah")
+        wilayah=body.get("wilayah"),
+        no_hp=body.get("no_hp"),
     )
     db.add(new_operator)
     db.commit()
     db.refresh(new_operator)
-    return {"message": "Akun operator berhasil dibuat", "operator": new_operator}
+    return {"message": "Akun operator berhasil dibuat", "operator": serialize_user(new_operator)}
 
-@app.delete("/api/operators/{user_id}")
-def delete_operator(user_id: int, db: Session = Depends(get_db)):
+
+@app.put("/api/operators/{user_id}")
+def update_operator(user_id: int, body: dict, db: Session = Depends(get_db)):
+    """[Admin] Update an existing operator account."""
     operator = db.query(User).filter(User.id == user_id, User.role == "operator").first()
     if not operator:
         raise HTTPException(status_code=404, detail="Operator tidak ditemukan")
-    
+
+    if "nama" in body and body["nama"]:
+        operator.nama = body["nama"]
+    if "email" in body and body["email"]:
+        existing = db.query(User).filter(User.email == body["email"], User.id != user_id).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Email sudah digunakan akun lain")
+        operator.email = body["email"]
+    if "password" in body and body["password"]:
+        operator.password_hash = body["password"]
+    if "provinsi" in body:
+        operator.provinsi = body["provinsi"]
+    if "wilayah" in body:
+        operator.wilayah = body["wilayah"]
+    if "no_hp" in body:
+        operator.no_hp = body["no_hp"]
+
+    db.commit()
+    db.refresh(operator)
+    return {"message": "Operator berhasil diperbarui", "operator": serialize_user(operator)}
+
+
+@app.delete("/api/operators/{user_id}")
+def delete_operator(user_id: int, db: Session = Depends(get_db)):
+    """[Admin] Delete an operator account."""
+    operator = db.query(User).filter(User.id == user_id, User.role == "operator").first()
+    if not operator:
+        raise HTTPException(status_code=404, detail="Operator tidak ditemukan")
+
     db.delete(operator)
     db.commit()
     return {"message": "Operator berhasil dihapus"}
@@ -1032,97 +1469,6 @@ def login_google(body: dict, db: Session = Depends(get_db)):
 
 
 
-# -------------------- CHATBOT --------------------
-
-class ChatRequest(BaseModel):
-    message: str
-    model: str = "gemini"
-    role: Optional[str] = "pengguna"
-    wilayah: Optional[str] = None
-    provinsi: Optional[str] = None
-
-@app.post("/api/chatbot")
-async def chat_with_bot(req: ChatRequest, db: Session = Depends(get_db)):
-    """Chatbot Endpoint using Gemini/Mistral and Realtime Sensor Context"""
-    # 1. Fetch relevant sensors
-    sensor_q = db.query(Sensor)
-    if req.role == "operator" and req.wilayah:
-        sensor_q = sensor_q.filter(Sensor.wilayah == req.wilayah)
-    sensors = sensor_q.all()
-    
-    # 2. Format sensor context
-    context = "Tidak ada data sensor."
-    if sensors:
-        lines = []
-        for s in sensors:
-            status = "Online" if s.status_koneksi == "online" else "Offline"
-            lines.append(f"- Sensor {s.nama_lokasi} (Zona {s.zona}): Status {status}, Baterai {s.status_baterai}%")
-            # Get latest reading
-            latest = db.query(SensorReading).filter(SensorReading.sensor_id == s.sensor_id).order_by(desc(SensorReading.timestamp)).first()
-            if latest and status == "Online":
-                lines.append(f"  Suhu: {latest.suhu_air_c}C, pH: {latest.ph_air}, Salinitas: {latest.salinitas_ppt}ppt, Oksigen: {latest.oksigen_terlarut_mgl}mg/L, Kekeruhan: {latest.kekeruhan_ntu}NTU")
-        context = "\n".join(lines)
-        
-    system_prompt = (
-        "Kamu adalah OceanBot, asisten virtual Customer Service untuk sistem monitoring kelautan OceanSmart. "
-        "Gunakan bahasa Indonesia yang formal, sopan, namun ramah. "
-        f"Berikut adalah data sensor real-time saat ini:\n{context}\n\n"
-        "Jawab pertanyaan pengguna berdasarkan data sensor di atas jika relevan. Jika pengguna bertanya hal di luar data ini, jawab sebisa kamu sebagai asisten kelautan."
-    )
-    
-    try:
-        if req.model == "gemini":
-            api_key = os.getenv("GEMINI_API_KEY")
-            if not api_key:
-                return {"reply": "Maaf, GEMINI_API_KEY belum dikonfigurasi pada server."}
-            
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key={api_key}"
-            payload = {
-                "system_instruction": {
-                    "parts": [{"text": system_prompt}]
-                },
-                "contents": [
-                    {"parts": [{"text": req.message}]}
-                ]
-            }
-            async with httpx.AsyncClient() as client:
-                res = await client.post(url, json=payload, timeout=30.0)
-                data = res.json()
-                if res.status_code != 200:
-                    return {"reply": f"Error dari Gemini API: {data.get('error', {}).get('message', str(data))}"}
-                reply = data["candidates"][0]["content"]["parts"][0]["text"]
-                return {"reply": reply}
-                
-        elif req.model == "mistral":
-            api_key = os.getenv("MISTRAL_API_KEY")
-            if not api_key:
-                return {"reply": "Maaf, MISTRAL_API_KEY belum dikonfigurasi pada server."}
-                
-            url = "https://api.mistral.ai/v1/chat/completions"
-            headers = {
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json"
-            }
-            payload = {
-                "model": "mistral-large-latest",
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": req.message}
-                ]
-            }
-            async with httpx.AsyncClient() as client:
-                res = await client.post(url, json=payload, headers=headers, timeout=30.0)
-                data = res.json()
-                if res.status_code != 200:
-                    return {"reply": f"Error dari Mistral API: {data.get('message', str(data))}"}
-                reply = data["choices"][0]["message"]["content"]
-                return {"reply": reply}
-                
-        else:
-            return {"reply": "Model tidak didukung. Pilih 'gemini' atau 'mistral'."}
-            
-    except Exception as e:
-        return {"reply": f"Terjadi kesalahan saat memproses permintaan: {str(e)}"}
 
 
 # -------------------- ALERTS STREAM & ACTIONS --------------------

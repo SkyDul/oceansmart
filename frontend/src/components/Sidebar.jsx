@@ -1,10 +1,10 @@
 import { NavLink, Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Map, Activity, Fish,
-  AlertTriangle, Waves, Globe, Settings, LogOut, User, Anchor, Sliders
+  AlertTriangle, Globe, Settings, LogOut, Anchor, Sliders
 } from 'lucide-react';
-import { useState, useEffect } from 'react';
-import api from '../api';
+import { useState } from 'react';
+import { useAlert } from './AlertNotifier';
 
 const navItemsAll = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -22,24 +22,22 @@ const operatorItems = [
 
 export default function Sidebar() {
   const location = useLocation();
-  const [alertCount, setAlertCount] = useState(0);
+  const { alerts } = useAlert();
 
-  // Ambil data user & role dari localStorage
+  // Badge count — unresolved alerts only, real-time from context
+  const alertCount = (alerts || []).filter(a => !a.is_resolved).length;
+
   const savedUser = JSON.parse(localStorage.getItem('ocean_user') || '{}');
   const userRole = localStorage.getItem('ocean_role') || 'pengguna';
   const userName = savedUser?.name || savedUser?.given_name || 'Pengguna';
   const userPhoto = savedUser?.picture || null;
   const [imgError, setImgError] = useState(false);
 
-  useEffect(() => {
-    api.get('/alerts?active_only=true&limit=100')
-      .then(res => setAlertCount(res.data.length))
-      .catch(() => {});
-  }, [location.pathname]);
-
   const handleLogout = () => {
     localStorage.removeItem('ocean_user');
     localStorage.removeItem('ocean_role');
+    localStorage.removeItem('ocean_wilayah');
+    localStorage.removeItem('ocean_provinsi');
     window.location.href = '/';
   };
 
@@ -60,22 +58,21 @@ export default function Sidebar() {
         {navItemsAll
           .filter(item => item.path !== '/simulator' || userRole === 'pengguna')
           .map(item => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            className={({ isActive }) =>
-              `sidebar-link ${isActive || location.pathname.startsWith(item.path) ? 'active' : ''}`
-            }
-          >
-            <item.icon size={20} />
-            <span className="sidebar-text">{item.label}</span>
-            {item.hasBadge && alertCount > 0 && (
-              <span className="sidebar-badge">{alertCount}</span>
-            )}
-          </NavLink>
-        ))}
+            <NavLink
+              key={item.path}
+              to={item.path}
+              className={({ isActive }) =>
+                `sidebar-link ${isActive || location.pathname.startsWith(item.path) ? 'active' : ''}`
+              }
+            >
+              <item.icon size={20} />
+              <span className="sidebar-text">{item.label}</span>
+              {item.hasBadge && alertCount > 0 && (
+                <span className="sidebar-badge">{alertCount}</span>
+              )}
+            </NavLink>
+          ))}
 
-        {/* Menu khusus Manajemen (Admin & Operator) */}
         {(userRole === 'operator' || userRole === 'admin') && (
           <>
             <div className="sidebar-section-label" style={{ marginTop: '1rem' }}>Manajemen</div>
@@ -108,13 +105,12 @@ export default function Sidebar() {
             )}
             <div className="sidebar-text" style={{ flex: 1 }}>
               <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{userName}</div>
-              <div style={{ fontSize: '0.6875rem', color: '#48cae4', textTransform: 'capitalize', fontWeight: 600 }}>
-                Role: {userRole}
-              </div>
+              <div style={{ fontSize: '0.6875rem', color: '#48cae4', textTransform: 'capitalize', fontWeight: 600 }}>Role: {userRole}</div>
             </div>
           </div>
         ) : (
-          <Link to="/profile" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', textDecoration: 'none', cursor: 'pointer', padding: '0.5rem', borderRadius: '0.5rem', transition: 'background 0.2s' }}
+          <Link to="/profile"
+            style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', textDecoration: 'none', cursor: 'pointer', padding: '0.5rem', borderRadius: '0.5rem', transition: 'background 0.2s' }}
             onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
           >
@@ -135,8 +131,7 @@ export default function Sidebar() {
         )}
         <button
           onClick={handleLogout}
-          title="Keluar"
-          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '0.6rem 0.75rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '0.5rem', color: 'rgba(255,255,255,0.7)', fontSize: '0.8125rem', cursor: 'pointer', transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)' }}
+          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '0.6rem 0.75rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '0.5rem', color: 'rgba(255,255,255,0.7)', fontSize: '0.8125rem', cursor: 'pointer', transition: 'all 0.25s' }}
           onMouseEnter={e => { e.currentTarget.style.background = 'rgba(220,38,38,0.2)'; e.currentTarget.style.color = '#fca5a5'; e.currentTarget.style.borderColor = 'rgba(220,38,38,0.3)'; }}
           onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = 'rgba(255,255,255,0.7)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; }}
         >

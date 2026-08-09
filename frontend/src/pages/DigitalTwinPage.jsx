@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Layers, Thermometer, Droplets, Wind, Eye, Activity, Heart, Play, Pause, SkipBack, Fish, AlertTriangle, Sliders, MapPin, ChevronDown, CheckCircle2, Globe, Building2 } from 'lucide-react';
 import '@google/model-viewer';
 import api from '../api';
+import { PROVINCES, KABUPATEN_BY_PROVINCE } from '../constants/regions';
 
 import modelNemo from '../assets/models/nemo.glb';
 import modelButterfly from '../assets/models/Butterfly Fish.glb';
@@ -43,55 +44,6 @@ const MODEL_MAP = {
   'Dugong': null,
 };
 
-const PROVINCES = [
-  { id: 'jabar', name: 'Jawa Barat' },
-  { id: 'banten', name: 'Banten' },
-  { id: 'dki', name: 'DKI Jakarta (Kep. Seribu)' },
-  { id: 'jateng', name: 'Jawa Tengah' },
-  { id: 'jatim', name: 'Jawa Timur' },
-  { id: 'bali', name: 'Bali' },
-];
-
-const KABUPATEN_BY_PROVINCE = {
-  jabar: [
-    { id: 'all', name: 'Semua Daerah Pesisir Jawa Barat' },
-    { id: 'Pangandaran', name: 'Kab. Pangandaran (Pesisir Selatan)' },
-    { id: 'Sukabumi', name: 'Kab. Sukabumi / Pelabuhan Ratu (Pesisir Selatan)' },
-    { id: 'Indramayu', name: 'Kab. Indramayu (Pesisir Utara / Pantura)' },
-    { id: 'Cirebon', name: 'Kota & Kab. Cirebon (Pesisir Utara)' },
-    { id: 'Karawang', name: 'Kab. Karawang (Pesisir Utara)' },
-    { id: 'Subang', name: 'Kab. Subang (Pesisir Utara)' },
-  ],
-  banten: [
-    { id: 'all', name: 'Semua Daerah Pesisir Banten' },
-    { id: 'Pandeglang', name: 'Kab. Pandeglang' },
-    { id: 'Serang', name: 'Kab. Serang' },
-    { id: 'Lebak', name: 'Kab. Lebak' },
-  ],
-  dki: [
-    { id: 'all', name: 'Semua Daerah Kepulauan Seribu' },
-    { id: 'Seribu Utara', name: 'Kec. Kepulauan Seribu Utara' },
-    { id: 'Seribu Selatan', name: 'Kec. Kepulauan Seribu Selatan' },
-  ],
-  jateng: [
-    { id: 'all', name: 'Semua Daerah Pesisir Jawa Tengah' },
-    { id: 'Jepara', name: 'Kab. Jepara' },
-    { id: 'Cilacap', name: 'Kab. Cilacap' },
-    { id: 'Kebumen', name: 'Kab. Kebumen' },
-  ],
-  jatim: [
-    { id: 'all', name: 'Semua Daerah Pesisir Jawa Timur' },
-    { id: 'Banyuwangi', name: 'Kab. Banyuwangi' },
-    { id: 'Situbondo', name: 'Kab. Situbondo' },
-    { id: 'Pacitan', name: 'Kab. Pacitan' },
-  ],
-  bali: [
-    { id: 'all', name: 'Semua Daerah Pesisir Bali' },
-    { id: 'Badung', name: 'Kab. Badung' },
-    { id: 'Buleleng', name: 'Kab. Buleleng' },
-    { id: 'Gianyar', name: 'Kab. Gianyar' },
-  ]
-};
 
 function getSensorsForProvinceAndKabupaten(provinceId, kabupatenId, realSensors) {
   if (provinceId === 'jabar') {
@@ -103,12 +55,34 @@ function getSensorsForProvinceAndKabupaten(provinceId, kabupatenId, realSensors)
   const kabList = KABUPATEN_BY_PROVINCE[provinceId] || [];
   const activeKabs = kabupatenId === 'all' ? kabList.filter(k => k.id !== 'all') : kabList.filter(k => k.id === kabupatenId);
   
+  const KAB_ABBREVIATIONS = {
+    'Pangandaran': 'PGD',
+    'Sukabumi': 'SKB',
+    'Indramayu': 'IDR',
+    'Cirebon': 'CRB',
+    'Karawang': 'KRW',
+    'Subang': 'SBG',
+    'Parangtritis': 'PRG',
+    'Karimunjawa': 'KJW',
+    'Nusa Penida': 'NPD',
+    'Buleleng': 'BLL',
+    'Banyuwangi': 'BWI',
+    'Wakatobi': 'WKT',
+    'Bunaken': 'BNK',
+    'Manggarai Barat': 'KMD',
+    'Raja Ampat': 'RAA',
+    'Maluku Tengah': 'MLK',
+    'Denpasar': 'DPS',
+    'Malang': 'MLG'
+  };
+
   let dummySensors = [];
   let index = 1;
   
   activeKabs.forEach(kab => {
+    const abbrev = KAB_ABBREVIATIONS[kab.name.replace('Kab. ', '').split(' ')[0]] || KAB_ABBREVIATIONS[kab.id] || kab.id.substring(0, 3).toUpperCase();
     for (let i = 1; i <= 2; i++) {
-      const sensorId = `OS-DUMMY-${provinceId.toUpperCase()}-${index.toString().padStart(3, '0')}`;
+      const sensorId = `OS-DUMMY-${abbrev}-${i.toString().padStart(3, '0')}`;
       dummySensors.push({
         sensor_id: sensorId,
         nama_lokasi: `Sensor Telemetri ${kab.name} #${i}`,

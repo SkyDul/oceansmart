@@ -18,6 +18,7 @@ import BiotaFormPage from './pages/BiotaFormPage';
 import OperatorAccountFormPage from './pages/OperatorAccountFormPage';
 import ProfilePage from './pages/ProfilePage';
 import ChatbotWidget from './components/ChatbotWidget';
+import SimulatorBanner from './components/SimulatorBanner';
 import TermsPage from './pages/TermsPage';
 import SimulatorPage from './pages/SimulatorPage';
 import './index.css';
@@ -28,6 +29,7 @@ const ProtectedLayout = ({ children }) => {
     <div className="app-layout">
       <Sidebar />
       <main className="main-content">
+        <SimulatorBanner />
         {children}
       </main>
       <ChatbotWidget />
@@ -52,7 +54,7 @@ function App() {
   useEffect(() => {
     const savedUser = localStorage.getItem('ocean_user');
     const savedRole = localStorage.getItem('ocean_role');
-    if (savedUser) {
+    if (savedUser || savedRole) {
       setIsAuthenticated(true);
       setUserRole(savedRole || 'pengguna');
     }
@@ -62,6 +64,9 @@ function App() {
     setIsAuthenticated(true);
     setUserRole(role);
     localStorage.setItem('ocean_role', role);
+    if (!localStorage.getItem('ocean_user')) {
+      localStorage.setItem('ocean_user', JSON.stringify({ role, name: role === 'admin' ? 'Administrator' : role === 'operator' ? 'Operator' : 'Pengguna Publik' }));
+    }
     if (wilayah) localStorage.setItem('ocean_wilayah', wilayah);
     if (provinsi) localStorage.setItem('ocean_provinsi', provinsi);
   };
@@ -114,6 +119,7 @@ function App() {
           <Route path="/operator/biota/add" element={<OperatorRoute isAuthenticated={isAuthenticated} userRole={userRole}><ProtectedLayout><BiotaFormPage /></ProtectedLayout></OperatorRoute>} />
           <Route path="/operator/biota/edit/:biotaId" element={<OperatorRoute isAuthenticated={isAuthenticated} userRole={userRole}><ProtectedLayout><BiotaFormPage /></ProtectedLayout></OperatorRoute>} />
           <Route path="/operator/accounts/add" element={<OperatorRoute isAuthenticated={isAuthenticated} userRole={userRole}><ProtectedLayout><OperatorAccountFormPage /></ProtectedLayout></OperatorRoute>} />
+          <Route path="/operator/accounts/edit/:operatorId" element={<OperatorRoute isAuthenticated={isAuthenticated} userRole={userRole}><ProtectedLayout><OperatorAccountFormPage /></ProtectedLayout></OperatorRoute>} />
 
           {/* Fallback */}
           <Route path="*" element={<Navigate to={isAuthenticated ? "/dashboard" : "/"} />} />

@@ -3,30 +3,6 @@ import { AlertTriangle, Check, Clock, Filter, MapPin, Calendar, X, Eye, LayoutGr
 import api from '../api';
 import { useAlert } from '../components/AlertNotifier';
 
-const PROVINCES = [
-  { id: 'jabar', name: 'Jawa Barat' },
-  { id: 'banten', name: 'Banten' },
-  { id: 'dki', name: 'DKI Jakarta (Kep. Seribu)' },
-  { id: 'jateng', name: 'Jawa Tengah' },
-  { id: 'jatim', name: 'Jawa Timur' },
-  { id: 'bali', name: 'Bali' },
-];
-
-const KABUPATEN_BY_PROVINCE = {
-  jabar: [
-    { id: 'all', name: 'Semua Daerah Pesisir Jawa Barat' },
-    { id: 'Pangandaran', name: 'Kab. Pangandaran' },
-    { id: 'Sukabumi', name: 'Kab. Sukabumi' },
-    { id: 'Indramayu', name: 'Kab. Indramayu' },
-    { id: 'Cirebon', name: 'Kota & Kab. Cirebon' },
-  ],
-  banten: [{ id: 'all', name: 'Semua Daerah Pesisir Banten' }],
-  dki: [{ id: 'all', name: 'Semua Daerah Kepulauan Seribu' }],
-  jateng: [{ id: 'all', name: 'Semua Daerah Pesisir Jawa Tengah' }],
-  jatim: [{ id: 'all', name: 'Semua Daerah Pesisir Jawa Timur' }],
-  bali: [{ id: 'all', name: 'Semua Daerah Pesisir Bali' }],
-};
-
 const getParamUnit = (param) => {
   const p = (param || '').toLowerCase();
   if (p.includes('suhu')) return '°C';
@@ -39,47 +15,34 @@ const getParamUnit = (param) => {
 export default function AlertsPage() {
   const { alerts, setAlerts } = useAlert();
   const [sensors, setSensors] = useState([]);
+  const [wilayahList, setWilayahList] = useState([]);
   const [activeOnly, setActiveOnly] = useState(false);
   const [selectedPriority, setSelectedPriority] = useState('all');
   const [selectedAlert, setSelectedAlert] = useState(null);
   const [viewMode, setViewMode] = useState('grid');
   const [sortBy, setSortBy] = useState('newest');
   const [selectedDate, setSelectedDate] = useState('');
-  const [selectedProvince, setSelectedProvince] = useState(() => localStorage.getItem('selected_province') || 'jabar');
-  const [selectedKabupaten, setSelectedKabupaten] = useState(() => localStorage.getItem('selected_kabupaten') || 'all');
-  const [selectedSensorId, setSelectedSensorId] = useState(() => localStorage.getItem('selected_sensor_id') || 'all');
+  const [selectedWilayah, setSelectedWilayah] = useState('all');
+  const [selectedSensorId, setSelectedSensorId] = useState('all');
   const userRole = localStorage.getItem('ocean_role') || 'pengguna';
 
   useEffect(() => {
     api.get('/sensors').then(res => setSensors(res.data)).catch(console.error);
+    api.get('/wilayah').then(res => setWilayahList(res.data)).catch(() => {});
   }, []);
 
-  useEffect(() => {
-    localStorage.setItem('selected_province', selectedProvince);
-    localStorage.setItem('selected_kabupaten', selectedKabupaten);
-    localStorage.setItem('selected_sensor_id', selectedSensorId);
-  }, [selectedProvince, selectedKabupaten, selectedSensorId]);
-
-  const handleResolve = async (id) => {
-    try {
-      await api.patch(`/alerts/${id}/resolve`);
-      setAlerts(prev => prev.map(a => a.id === id ? { ...a, is_resolved: true } : a));
-      if (selectedAlert?.id === id) setSelectedAlert(prev => ({ ...prev, is_resolved: true }));
-    } catch (e) {
-      console.error(e);
-      alert('Gagal menyelesaikan peringatan.');
-    }
-  };
-
-  const activeSensors = sensors.filter(s => {
-    if (selectedProvince !== 'jabar') return false;
-    if (selectedKabupaten !== 'all' && s.kabupaten !== selectedKabupaten) return false;
-    return true;
-  });
+  // Sensors filtered by wilayah
+  const activeSensors = selectedWilayah === 'all'
+    ? sensors
+    : sensors.filter(s => (s.wilayah || '').toLowerCase() === selectedWilayah.toLowerCase());
 
   const filteredAlerts = alerts.filter(a => {
     if (activeOnly && a.is_resolved) return false;
     if (selectedPriority !== 'all' && a.level !== selectedPriority) return false;
+    if (selectedWilayah !== 'all') {
+      const sensorInWilayah = activeSensors.some(s => s.sensor_id === a.sensor_id);
+      if (!sensorInWilayah) return false;
+    }
     if (selectedSensorId !== 'all' && a.sensor_id !== selectedSensorId) return false;
     if (selectedDate && a.created_at) {
       if (new Date(a.created_at).toLocaleDateString('sv-SE') !== selectedDate) return false;
@@ -93,6 +56,17 @@ export default function AlertsPage() {
     if (sortBy === 'level') return (b.level === 'bahaya' ? 1 : 0) - (a.level === 'bahaya' ? 1 : 0);
     return 0;
   });
+
+  const handleResolve = async (id) => {
+    try {
+      await api.patch(`/alerts/${id}/resolve`);
+      setAlerts(prev => prev.map(a => a.id === id ? { ...a, is_resolved: true } : a));
+      if (selectedAlert?.id === id) setSelectedAlert(prev => ({ ...prev, is_resolved: true }));
+    } catch (e) {
+      console.error(e);
+      alert('Gagal menyelesaikan peringatan.');
+    }
+  };
 
   const activeBahaya = filteredAlerts.filter(a => a.level === 'bahaya' && !a.is_resolved).length;
   const activeWaspada = filteredAlerts.filter(a => a.level === 'waspada' && !a.is_resolved).length;
@@ -120,8 +94,29 @@ export default function AlertsPage() {
           </div>
           {[
             { label: 'Prioritas', el: <select value={selectedPriority} onChange={e => setSelectedPriority(e.target.value)} style={{ border: 'none', background: 'transparent', outline: 'none', fontWeight: 600, color: '#0f172a', fontSize: '0.8125rem', cursor: 'pointer' }}><option value="all">Semua</option><option value="bahaya">Bahaya</option><option value="waspada">Waspada</option></select> },
-            { label: 'Provinsi', el: <select value={selectedProvince} onChange={e => { setSelectedProvince(e.target.value); setSelectedKabupaten('all'); setSelectedSensorId('all'); }} style={{ border: 'none', background: 'transparent', outline: 'none', fontWeight: 600, color: '#0f172a', fontSize: '0.8125rem', cursor: 'pointer' }}>{PROVINCES.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select> },
-            { label: 'Daerah', el: <select value={selectedKabupaten} onChange={e => { setSelectedKabupaten(e.target.value); setSelectedSensorId('all'); }} style={{ border: 'none', background: 'transparent', outline: 'none', fontWeight: 600, color: '#0f172a', fontSize: '0.8125rem', cursor: 'pointer' }}>{(KABUPATEN_BY_PROVINCE[selectedProvince] || []).map(k => <option key={k.id} value={k.id}>{k.name}</option>)}</select> },
+            { label: 'Wilayah', el: (
+              <select 
+                value={selectedWilayah} 
+                onChange={e => { setSelectedWilayah(e.target.value); setSelectedSensorId('all'); }} 
+                style={{ border: 'none', background: 'transparent', outline: 'none', fontWeight: 600, color: '#0f172a', fontSize: '0.8125rem', cursor: 'pointer' }}
+              >
+                <option value="all">Semua Wilayah</option>
+                {Object.entries(
+                  wilayahList.reduce((acc, item) => {
+                    const prov = item.provinsi || 'Lainnya';
+                    if (!acc[prov]) acc[prov] = [];
+                    acc[prov].push(item);
+                    return acc;
+                  }, {})
+                ).map(([province, items]) => (
+                  <optgroup key={province} label={province}>
+                    {items.map(w => (
+                      <option key={w.wilayah} value={w.wilayah}>{w.wilayah}</option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            ) },
           ].map(({ label, el }) => (
             <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '0.4rem', padding: '0.25rem 0.6rem' }}>
               <span style={{ fontSize: '0.6875rem', fontWeight: 600, color: '#64748b' }}>{label}:</span>{el}
@@ -130,8 +125,8 @@ export default function AlertsPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', background: '#0369a1', border: '1px solid #0369a1', borderRadius: '0.4rem', padding: '0.25rem 0.6rem' }}>
             <span style={{ fontSize: '0.6875rem', fontWeight: 600, color: 'rgba(255,255,255,0.8)' }}>Sensor:</span>
             <select value={selectedSensorId} onChange={e => setSelectedSensorId(e.target.value)} style={{ border: 'none', background: 'transparent', color: '#fff', outline: 'none', fontWeight: 600, fontSize: '0.8125rem', cursor: 'pointer' }}>
-              <option value="all" style={{ color: '#0f172a' }}>Semua</option>
-              {activeSensors.map(s => <option key={s.sensor_id} value={s.sensor_id} style={{ color: '#0f172a' }}>{s.sensor_id}</option>)}
+              <option value="all" style={{ color: '#0f172a' }}>Semua ({activeSensors.length})</option>
+              {activeSensors.map(s => <option key={s.sensor_id} value={s.sensor_id} style={{ color: '#0f172a' }}>{s.nama_lokasi} — {s.sensor_id}</option>)}
             </select>
           </div>
         </div>

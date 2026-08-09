@@ -66,35 +66,82 @@ api.interceptors.response.use(
           modified.status_baterai = sandbox.battery_levels[modified.sensor_id];
           if (modified.status_baterai <= 0) modified.status_koneksi = 'offline';
         } else if (sandbox.drain_battery) {
-          modified.status_baterai = Math.max(0, modified.status_baterai - 20); // Simulate drain visually
+          // Persist actual battery reduction so it accumulates over time
+          if (sandbox.battery_levels[modified.sensor_id] === undefined) {
+            sandbox.battery_levels[modified.sensor_id] = modified.status_baterai;
+          }
+          sandbox.battery_levels[modified.sensor_id] = Math.max(0, sandbox.battery_levels[modified.sensor_id] - 10);
+          modified.status_baterai = sandbox.battery_levels[modified.sensor_id];
+          setSandbox(sandbox);
           if (modified.status_baterai <= 0) modified.status_koneksi = 'offline';
         }
         
-        // Apply anomaly
-        if (sandbox.active_anomaly === 'heatwave') {
-          modified.suhu_celsius = 31.5 + Math.random() * 2;
-        } else if (sandbox.active_anomaly === 'storm') {
-          modified.kekeruhan_ntu = 25.0 + Math.random() * 10;
-        } else if (sandbox.active_anomaly === 'acidification') {
-          modified.ph = 7.0 + Math.random() * 0.5;
+        // Apply anomaly to both top-level fields AND latest_reading
+        if (sandbox.active_anomaly !== 'normal') {
+          const reading = modified.latest_reading ? { ...modified.latest_reading } : {};
+
+          if (sandbox.active_anomaly === 'heatwave') {
+            const newSuhu = parseFloat((31.5 + Math.random() * 2).toFixed(1));
+            modified.suhu_celsius = newSuhu;
+            reading.suhu_celsius = newSuhu;
+            reading.do_mg_l = parseFloat(Math.max(2, (reading.do_mg_l || 6) - 2.5).toFixed(1));
+            reading.health_index = Math.max(0, Math.round((reading.health_index || 80) - 35));
+          } else if (sandbox.active_anomaly === 'storm') {
+            const newTurb = parseFloat((25.0 + Math.random() * 10).toFixed(1));
+            modified.kekeruhan_ntu = newTurb;
+            reading.kekeruhan_ntu = newTurb;
+            const newSal = parseFloat(Math.max(25, (reading.salinitas_ppt || 32) - 5.5).toFixed(1));
+            reading.salinitas_ppt = newSal;
+            reading.health_index = Math.max(0, Math.round((reading.health_index || 80) - 20));
+          } else if (sandbox.active_anomaly === 'acidification') {
+            const newPh = parseFloat((7.0 + Math.random() * 0.5).toFixed(2));
+            modified.ph = newPh;
+            reading.ph = newPh;
+            reading.health_index = Math.max(0, Math.round((reading.health_index || 80) - 40));
+          }
+
+          if (modified.latest_reading) {
+            modified.latest_reading = reading;
+          }
         }
         
         return modified;
       });
       response.data = data;
     }
+
+    // Manipulate /sensors/{id}/readings (chart data in Monitoring)
+    if (url.match(/\/sensors\/.+\/readings/) && Array.isArray(response.data) && sandbox.active_anomaly !== 'normal') {
+      response.data = response.data.map(r => {
+        const reading = { ...r };
+        if (sandbox.active_anomaly === 'heatwave') {
+          reading.suhu_celsius = parseFloat((31.5 + Math.random() * 2).toFixed(1));
+          reading.do_mg_l = parseFloat(Math.max(2, reading.do_mg_l - 2.5).toFixed(1));
+          reading.health_index = Math.max(0, Math.round(reading.health_index - 35));
+        } else if (sandbox.active_anomaly === 'acidification') {
+          reading.ph = parseFloat((7.0 + Math.random() * 0.5).toFixed(2));
+          reading.health_index = Math.max(0, Math.round(reading.health_index - 40));
+        } else if (sandbox.active_anomaly === 'storm') {
+          reading.kekeruhan_ntu = parseFloat((25.0 + Math.random() * 10).toFixed(1));
+          reading.salinitas_ppt = parseFloat(Math.max(25, reading.salinitas_ppt - 5.5).toFixed(1));
+          reading.health_index = Math.max(0, Math.round(reading.health_index - 20));
+        }
+        return reading;
+      });
+    }
     
     // Manipulate /dashboard/summary data
     if (url.includes('/dashboard/summary') && sandbox.active_anomaly !== 'normal') {
       let data = { ...response.data };
       if (sandbox.active_anomaly === 'heatwave') {
-        data.avg_suhu = (31.5 + Math.random() * 2).toFixed(1);
-        data.ocean_health_index = Math.max(0, data.ocean_health_index - 30);
+        data.avg_health_index = Math.max(0, Math.round((data.avg_health_index || 80) - 35));
+        data.active_alerts = (data.active_alerts || 0) + 3;
       } else if (sandbox.active_anomaly === 'acidification') {
-        data.avg_ph = (7.0 + Math.random() * 0.5).toFixed(1);
-        data.ocean_health_index = Math.max(0, data.ocean_health_index - 40);
+        data.avg_health_index = Math.max(0, Math.round((data.avg_health_index || 80) - 40));
+        data.active_alerts = (data.active_alerts || 0) + 2;
       } else if (sandbox.active_anomaly === 'storm') {
-        data.ocean_health_index = Math.max(0, data.ocean_health_index - 20);
+        data.avg_health_index = Math.max(0, Math.round((data.avg_health_index || 80) - 20));
+        data.active_alerts = (data.active_alerts || 0) + 1;
       }
       response.data = data;
     }

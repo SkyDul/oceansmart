@@ -30,26 +30,6 @@ function getHealthStatus(index) {
   return 'Kritis';
 }
 
-const PROVINCES = [
-  { id: 'jabar', name: 'Jawa Barat' },
-  { id: 'jatim', name: 'Jawa Timur' },
-];
-
-const KABUPATEN_BY_PROVINCE = {
-  jabar: [
-    { id: 'all', name: 'Semua Wilayah' },
-    { id: 'pangandaran', name: 'Kab. Pangandaran' },
-    { id: 'pelabuhan_ratu', name: 'Pelabuhan Ratu' },
-    { id: 'cirebon', name: 'Cirebon' },
-  ],
-  jatim: [
-    { id: 'all', name: 'Semua Wilayah' },
-    { id: 'banyuwangi', name: 'Kab. Banyuwangi' },
-    { id: 'pacitan', name: 'Kab. Pacitan' },
-    { id: 'malang', name: 'Malang Selatan' },
-  ]
-};
-
 // Controller component to handle map flyTo animations dynamically
 function MapController({ activeSensor }) {
   const map = useMap();
@@ -68,30 +48,24 @@ export default function MapPage() {
   const [sensors, setSensors] = useState([]);
   const [zones, setZones] = useState([]);
   const [healthData, setHealthData] = useState([]);
+  const [wilayahList, setWilayahList] = useState([]);
   const [showZones, setShowZones] = useState(true);
   const [showHealth, setShowHealth] = useState(true);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSensor, setActiveSensor] = useState(null);
-  const [sidebarTab, setSidebarTab] = useState('sensors'); // 'sensors' | 'legend'
+  const [sidebarTab, setSidebarTab] = useState('sensors');
+  const [selectedWilayah, setSelectedWilayah] = useState('all');
   const navigate = useNavigate();
 
   const userRole = localStorage.getItem('ocean_role') || 'pengguna';
   const userProv = localStorage.getItem('ocean_provinsi') || '';
   const userWilayah = localStorage.getItem('ocean_wilayah') || '';
-  
-  const getProvId = (provName) => {
-    if (!provName) return 'jabar';
-    const lower = provName.toLowerCase();
-    if (lower.includes('barat')) return 'jabar';
-    if (lower.includes('timur')) return 'jatim';
-    return 'jabar';
-  };
-
-  const [selectedProvince, setSelectedProvince] = useState(() => (userRole === 'operator' && userProv) ? getProvId(userProv) : 'jabar');
-  const [selectedKabupaten, setSelectedKabupaten] = useState(() => (userRole === 'operator' && userWilayah) ? userWilayah : 'all');
 
   useEffect(() => {
+    // Fetch wilayah list for dropdown
+    api.get('/wilayah').then(res => setWilayahList(res.data)).catch(() => {});
+
     Promise.all([
       api.get('/sensors'),
       api.get('/zones'),
@@ -122,29 +96,18 @@ export default function MapPage() {
 
   const center = [-7.7100, 108.6200]; // Centered at West Java coast (Pangandaran)
 
-  // Filter sensors based on search query and region
+  // Filter sensors based on search query and wilayah
   const filteredSensors = sensors.filter(s => {
     const matchesSearch = s.sensor_id.toLowerCase().includes(searchQuery.toLowerCase()) || s.nama_lokasi.toLowerCase().includes(searchQuery.toLowerCase());
     if (!matchesSearch) return false;
-    
-    // Region filtering
-    if (selectedKabupaten !== 'all') {
-      if ((s.wilayah || '').toLowerCase() !== selectedKabupaten.toLowerCase() && !s.nama_lokasi.toLowerCase().includes(selectedKabupaten.toLowerCase())) {
-        return false;
-      }
-    } else if (selectedProvince && s.provinsi) {
-      if (s.provinsi !== selectedProvince) return false;
+    // Wilayah filter — use direct wilayah name matching
+    if (selectedWilayah && selectedWilayah !== 'all') {
+      if ((s.wilayah || '').toLowerCase() !== selectedWilayah.toLowerCase()) return false;
     }
     return true;
   });
 
-  const getProvinceName = () => PROVINCES.find(p => p.id === selectedProvince)?.name || 'Jawa Barat';
-  const getKabupatenName = () => {
-    const list = KABUPATEN_BY_PROVINCE[selectedProvince] || [];
-    const kab = list.find(k => k.id === selectedKabupaten);
-    return kab ? kab.name : selectedKabupaten;
-  };
-  const regionLabel = userRole === 'operator' ? `${userWilayah}, ${userProv}` : (selectedKabupaten !== 'all' ? getKabupatenName() : getProvinceName());
+  const regionLabel = userRole === 'operator' ? `${userWilayah}` : (selectedWilayah !== 'all' ? selectedWilayah : 'Semua Wilayah Indonesia');
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#f8fafc' }}>
@@ -162,20 +125,24 @@ export default function MapPage() {
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
               <select 
                 className="select select-sm select-bordered" 
-                value={selectedProvince}
-                onChange={e => { setSelectedProvince(e.target.value); setSelectedKabupaten('all'); }}
+                value={selectedWilayah}
+                onChange={e => setSelectedWilayah(e.target.value)}
                 style={{ fontSize: '0.8125rem', fontWeight: 600, borderColor: '#cbd5e1' }}
               >
-                {PROVINCES.map(p => <option key={p.id} value={p.id}>Provinsi: {p.name}</option>)}
-              </select>
-              <select 
-                className="select select-sm select-bordered" 
-                value={selectedKabupaten}
-                onChange={e => setSelectedKabupaten(e.target.value)}
-                style={{ fontSize: '0.8125rem', fontWeight: 600, borderColor: '#cbd5e1' }}
-              >
-                {(KABUPATEN_BY_PROVINCE[selectedProvince] || []).map(k => (
-                  <option key={k.id} value={k.id}>{k.name}</option>
+                <option value="all">Semua Wilayah ({sensors.length})</option>
+                {Object.entries(
+                  wilayahList.reduce((acc, item) => {
+                    const prov = item.provinsi || 'Lainnya';
+                    if (!acc[prov]) acc[prov] = [];
+                    acc[prov].push(item);
+                    return acc;
+                  }, {})
+                ).map(([province, items]) => (
+                  <optgroup key={province} label={province}>
+                    {items.map(w => (
+                      <option key={w.wilayah} value={w.wilayah}>{w.wilayah}</option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
             </div>

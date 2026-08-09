@@ -9,123 +9,37 @@ import {
   ResponsiveContainer, AreaChart, Area
 } from 'recharts';
 import api from '../api';
+import { PROVINCES, KABUPATEN_BY_PROVINCE } from '../constants/regions';
 
-const PROVINCES = [
-  { id: 'jabar', name: 'Jawa Barat' },
-  { id: 'banten', name: 'Banten' },
-  { id: 'dki', name: 'DKI Jakarta (Kep. Seribu)' },
-  { id: 'jateng', name: 'Jawa Tengah' },
-  { id: 'jatim', name: 'Jawa Timur' },
-  { id: 'bali', name: 'Bali' },
-];
-
-const KABUPATEN_BY_PROVINCE = {
-  jabar: [
-    { id: 'all', name: 'Semua Daerah Pesisir Jawa Barat' },
-    { id: 'Pangandaran', name: 'Kab. Pangandaran (Pesisir Selatan)' },
-    { id: 'Sukabumi', name: 'Kab. Sukabumi / Pelabuhan Ratu (Pesisir Selatan)' },
-    { id: 'Indramayu', name: 'Kab. Indramayu (Pesisir Utara / Pantura)' },
-    { id: 'Cirebon', name: 'Kota & Kab. Cirebon (Pesisir Utara)' },
-    { id: 'Karawang', name: 'Kab. Karawang (Pesisir Utara)' },
-    { id: 'Subang', name: 'Kab. Subang (Pesisir Utara)' },
-  ],
-  banten: [
-    { id: 'all', name: 'Semua Daerah Pesisir Banten' },
-    { id: 'Pandeglang', name: 'Kab. Pandeglang' },
-    { id: 'Serang', name: 'Kab. Serang' },
-    { id: 'Lebak', name: 'Kab. Lebak' },
-  ],
-  dki: [
-    { id: 'all', name: 'Semua Daerah Kepulauan Seribu' },
-    { id: 'Seribu Utara', name: 'Kec. Kepulauan Seribu Utara' },
-    { id: 'Seribu Selatan', name: 'Kec. Kepulauan Seribu Selatan' },
-  ],
-  jateng: [
-    { id: 'all', name: 'Semua Daerah Pesisir Jawa Tengah' },
-    { id: 'Jepara', name: 'Kab. Jepara' },
-    { id: 'Cilacap', name: 'Kab. Cilacap' },
-    { id: 'Kebumen', name: 'Kab. Kebumen' },
-  ],
-  jatim: [
-    { id: 'all', name: 'Semua Daerah Pesisir Jawa Timur' },
-    { id: 'Banyuwangi', name: 'Kab. Banyuwangi' },
-    { id: 'Situbondo', name: 'Kab. Situbondo' },
-    { id: 'Pacitan', name: 'Kab. Pacitan' },
-  ],
-  bali: [
-    { id: 'all', name: 'Semua Daerah Pesisir Bali' },
-    { id: 'Badung', name: 'Kab. Badung' },
-    { id: 'Buleleng', name: 'Kab. Buleleng' },
-    { id: 'Gianyar', name: 'Kab. Gianyar' },
-  ]
-};
 
 function getSensorsForProvinceAndKabupaten(provinceId, kabupatenId, realSensors) {
-  if (provinceId === 'jabar') {
-    return kabupatenId === 'all' 
-      ? realSensors 
-      : realSensors.filter(s => 
-          (s.wilayah || '').toLowerCase() === kabupatenId.toLowerCase() ||
-          s.nama_lokasi.toLowerCase().includes(kabupatenId.toLowerCase())
-        );
+  // Single source of truth — semua dari DB via API
+  // Filter berdasarkan wilayah/kabupaten kalau dipilih spesifik
+  if (kabupatenId && kabupatenId !== 'all') {
+    return realSensors.filter(s =>
+      (s.wilayah || '').toLowerCase() === kabupatenId.toLowerCase() ||
+      s.nama_lokasi.toLowerCase().includes(kabupatenId.toLowerCase())
+    );
   }
 
-  const kabList = KABUPATEN_BY_PROVINCE[provinceId] || [];
-  const activeKabs = kabupatenId === 'all' ? kabList.filter(k => k.id !== 'all') : kabList.filter(k => k.id === kabupatenId);
-  
-  let dummySensors = [];
-  let index = 1;
-  
-  activeKabs.forEach(kab => {
-    for (let i = 1; i <= 2; i++) {
-      const sensorId = `OS-DUMMY-${provinceId.toUpperCase()}-${index.toString().padStart(3, '0')}`;
-      dummySensors.push({
-        sensor_id: sensorId,
-        nama_lokasi: `Sensor Telemetri ${kab.name} #${i}`,
-        lat: provinceId === 'bali' ? -8.4 + (index * 0.05) : -6.5 - (index * 0.05),
-        lng: provinceId === 'bali' ? 115.1 + (index * 0.05) : 106.8 + (index * 0.05),
-        kedalaman_m: 2 + (index * 3) % 15,
-        status_koneksi: 'online',
-        status_baterai: 80 + (index * 7) % 21,
-        kabupaten: kab.id,
-        latest_reading: {
-          timestamp: new Date().toISOString(),
-          ph: parseFloat((8.1 + Math.sin(index) * 0.25).toFixed(2)),
-          suhu_celsius: parseFloat((28.2 + Math.cos(index) * 1.1).toFixed(1)),
-          salinitas_ppt: parseFloat((32.5 + Math.sin(index * 2) * 0.8).toFixed(1)),
-          do_mg_l: parseFloat((6.8 + Math.cos(index * 2) * 0.7).toFixed(1)),
-          kekeruhan_ntu: parseFloat((2.1 + Math.abs(Math.sin(index * 3)) * 2).toFixed(1)),
-          health_index: 75 + (index * 4) % 21
-        }
-      });
-      index++;
-    }
-  });
-  
-  return dummySensors;
+  // Filter berdasarkan provinsi
+  if (provinceId && provinceId !== 'all') {
+    const provMap = {
+      'jabar': 'jawa barat', 'banten': 'banten', 'dki': 'jakarta',
+      'jateng': 'jawa tengah', 'jatim': 'jawa timur', 'diy': 'yogyakarta',
+      'bali': 'bali', 'ntt': 'nusa tenggara timur', 'sultra': 'sulawesi tenggara',
+      'sulut': 'sulawesi utara', 'maluku': 'maluku', 'papua': 'papua',
+    };
+    const keyword = provMap[provinceId] || provinceId;
+    return realSensors.filter(s =>
+      (s.provinsi || '').toLowerCase().includes(keyword.split(' ')[0])
+    );
+  }
+
+  return realSensors;
 }
 
-function getDummyReadings(sensor, period) {
-  const points = 24;
-  const now = new Date();
-  const readings = [];
-  const baseReading = sensor.latest_reading || { ph: 8.0, suhu_celsius: 28, salinitas_ppt: 32.5, do_mg_l: 6.8, kekeruhan_ntu: 2.1, health_index: 82 };
-  
-  for (let i = points; i >= 0; i--) {
-    const timestamp = new Date(now.getTime() - i * 3600 * 1000);
-    const factor = Math.sin(i / 3);
-    readings.push({
-      timestamp: timestamp.toISOString(),
-      ph: parseFloat((baseReading.ph + factor * 0.12).toFixed(2)),
-      suhu_celsius: parseFloat((baseReading.suhu_celsius + factor * 0.7).toFixed(1)),
-      salinitas_ppt: parseFloat((baseReading.salinitas_ppt + factor * 0.4).toFixed(1)),
-      do_mg_l: parseFloat((baseReading.do_mg_l + factor * 0.35).toFixed(1)),
-      kekeruhan_ntu: parseFloat(Math.max(0, baseReading.kekeruhan_ntu + factor * 0.8).toFixed(1)),
-      health_index: Math.max(0, Math.min(100, Math.round(baseReading.health_index + factor * 4)))
-    });
-  }
-  return readings;
-}
+
 
 function getHealthLabel(v) {
   if (v >= 85) return { label: 'Sangat Baik', cls: 'excellent' };
@@ -158,9 +72,7 @@ export default function Dashboard() {
 
   const getKabId = (provId, wilName) => {
     if (!wilName) return 'all';
-    const list = KABUPATEN_BY_PROVINCE[provId] || [];
-    const found = list.find(k => k.id.toLowerCase() === wilName.toLowerCase() || wilName.toLowerCase().includes(k.id.toLowerCase()) || k.id.toLowerCase().includes(wilName.toLowerCase()));
-    return found ? found.id : wilName;
+    return wilName;
   };
 
   // Cascading Selection State
@@ -195,16 +107,10 @@ export default function Dashboard() {
         .finally(() => setLoading(false));
     };
 
-    // Update provinsi header before fetching so backend receives correct value
-    if (userRole !== 'operator') {
-      const provName = PROVINCES.find(p => p.id === selectedProvince)?.name || '';
-      localStorage.setItem('ocean_provinsi', provName);
-    }
-
     fetchData();
-    const interval = setInterval(fetchData, 15000);
+    const interval = setInterval(fetchData, 10000);
     return () => clearInterval(interval);
-  }, [selectedProvince]); // re-fetch when province changes
+  }, [selectedProvince]);
 
   // Save selected regions to local storage
   useEffect(() => {
@@ -220,21 +126,16 @@ export default function Dashboard() {
     ? (activeSensors.length > 0 ? activeSensors[0] : null)
     : (activeSensors.find(s => s.sensor_id === selectedSensorId) || (activeSensors.length > 0 ? activeSensors[0] : null));
 
-  // Load trend data for active sensor
+  // Load trend data from API — selalu dari API, tidak ada fallback dummy
   useEffect(() => {
     if (!selectedSensor) {
       setTrendData([]);
       return;
     }
-
-    if (selectedProvince === 'jabar' && !selectedSensor.sensor_id.includes('DUMMY')) {
-      api.get(`/sensors/${selectedSensor.sensor_id}/readings?period=24h`)
-        .then(res => setTrendData(res.data))
-        .catch(err => console.error(err));
-    } else {
-      setTrendData(getDummyReadings(selectedSensor, '24h'));
-    }
-  }, [selectedSensor?.sensor_id, selectedProvince]);
+    api.get(`/sensors/${selectedSensor.sensor_id}/readings?period=24h`)
+      .then(res => setTrendData(res.data))
+      .catch(err => console.error(err));
+  }, [selectedSensor?.sensor_id]);
 
   if (loading) {
     return (
