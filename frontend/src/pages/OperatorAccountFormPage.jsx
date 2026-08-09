@@ -151,10 +151,10 @@ export default function OperatorAccountFormPage() {
         <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <h2 style={{ fontSize: '1.6rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.25rem 0' }}>
-              Pendaftaran Operator Baru
+              {isEdit ? 'Edit Data Operator' : 'Pendaftaran Operator Baru'}
             </h2>
             <p style={{ color: '#64748b', margin: 0, fontSize: '0.875rem' }}>
-              Registrasikan akun operator baru untuk wilayah tugas konservasi tertentu.
+              {isEdit ? 'Perbarui informasi akun operator wilayah.' : 'Registrasikan akun operator baru untuk wilayah tugas konservasi tertentu.'}
             </p>
           </div>
           <div style={{ width: 40, height: 40, borderRadius: '0.75rem', background: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -207,6 +207,7 @@ export default function OperatorAccountFormPage() {
                   <div>
                     {label(<MapPin size={14} color="#0284c7" />, 'Provinsi Tugas')}
                     <select style={{ ...inputCls('provinsi'), padding: '0.75rem 0.875rem', fontSize: '0.9375rem' }} value={form.provinsi} onChange={e => set('provinsi', e.target.value)}>
+                      <option value="">Pilih Provinsi...</option>
                       <option value="Jawa Barat">Jawa Barat</option>
                       <option value="Jawa Tengah">Jawa Tengah</option>
                       <option value="Jawa Timur">Jawa Timur</option>
@@ -215,6 +216,8 @@ export default function OperatorAccountFormPage() {
                       <option value="DI Yogyakarta">DI Yogyakarta</option>
                       <option value="Bali">Bali</option>
                       <option value="Nusa Tenggara Timur">Nusa Tenggara Timur</option>
+                      <option value="Sulawesi Tenggara">Sulawesi Tenggara</option>
+                      <option value="Sulawesi Utara">Sulawesi Utara</option>
                       <option value="Maluku">Maluku</option>
                       <option value="Papua Barat Daya">Papua Barat Daya</option>
                       <option value="Lainnya">Lainnya...</option>
@@ -281,7 +284,7 @@ export default function OperatorAccountFormPage() {
                 display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 4px 12px rgba(2,62,138,0.15)'
               }}
             >
-              {saving ? 'Mendaftarkan...' : <><CheckCircle2 size={14} /> Daftarkan</>}
+              {saving ? (isEdit ? 'Menyimpan...' : 'Mendaftarkan...') : <><CheckCircle2 size={14} /> {isEdit ? 'Simpan Perubahan' : 'Daftarkan'}</>}
             </button>
           </div>
 

@@ -20,6 +20,15 @@ import modelHalibut from '../assets/models/Halibut.glb';
 import modelBullShark from '../assets/models/shark.glb';
 import modelCrayfish from '../assets/models/Crayfish.glb';
 import modelSwordfish from '../assets/models/Swordfish.glb';
+import modelAnglerfish from '../assets/models/Anglerfish.glb';
+import modelCoralGrouper from '../assets/models/CoralGrouper.glb';
+import modelDolphin from '../assets/models/Dolphin.glb';
+import modelMackerel from '../assets/models/Mackerel.glb';
+import modelGoblinShark from '../assets/models/GoblinShark.glb';
+import modelRoyalGramma from '../assets/models/RoyalGramma.glb';
+import modelSeaUrchin from '../assets/models/SeaUrchin.glb';
+import modelTurbot from '../assets/models/Turbot.glb';
+import modelBlueWhale from '../assets/models/BlueWhale.glb';
 
 const MODEL_MAP = {
   'Ikan Badut (Nemo)': modelNemo,
@@ -39,6 +48,15 @@ const MODEL_MAP = {
   'Hiu Banteng': modelBullShark,
   'Lobster Mutiara': modelCrayfish,
   'Ikan Todak': modelSwordfish,
+  'Ikan Sungut Ganda (Anglerfish)': modelAnglerfish,
+  'Kerapu Sunu (Coral Grouper)': modelCoralGrouper,
+  'Lumba-lumba Botol': modelDolphin,
+  'Ikan Kembung': modelMackerel,
+  'Hiu Goblin': modelGoblinShark,
+  'Ikan Gramma Kerajaan': modelRoyalGramma,
+  'Bulu Babi': modelSeaUrchin,
+  'Ikan Turbot': modelTurbot,
+  'Paus Biru': modelBlueWhale,
 };
 
 const BiotaModelViewer = ({ src }) => {

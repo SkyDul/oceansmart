@@ -1,9 +1,119 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Lock, LogIn, Anchor, Eye, EyeOff, Home, User } from 'lucide-react';
+import { Lock, LogIn, Anchor, Eye, EyeOff, Home, User, KeyRound, X, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useGoogleLogin } from '@react-oauth/google';
 import axios from 'axios';
 import api from '../api';
+
+function ForgotPasswordModal({ onClose }) {
+  const [step, setStep]         = useState(1);
+  const [email, setEmail]       = useState('');
+  const [token, setToken]       = useState('');
+  const [newPass, setNewPass]   = useState('');
+  const [showPass, setShowPass] = useState(false);
+  const [loading, setLoading]   = useState(false);
+  const [msg, setMsg]           = useState(null);
+
+  const requestReset = async () => {
+    if (!email.trim()) { setMsg({ type: 'error', text: 'Masukkan email terlebih dahulu.' }); return; }
+    setLoading(true); setMsg(null);
+    try {
+      await api.post('/forgot-password', { email });
+      setMsg({ type: 'success', text: 'Kode reset telah dikirim ke email Anda. Periksa inbox/spam.' });
+      setStep(2);
+    } catch (err) {
+      setMsg({ type: 'error', text: err.response?.data?.detail || 'Email tidak ditemukan.' });
+    } finally { setLoading(false); }
+  };
+
+  const doReset = async () => {
+    if (!token.trim() || !newPass) { setMsg({ type: 'error', text: 'Semua field wajib diisi.' }); return; }
+    if (newPass.length < 6) { setMsg({ type: 'error', text: 'Password minimal 6 karakter.' }); return; }
+    setLoading(true); setMsg(null);
+    try {
+      await api.post('/reset-password', { email, token, new_password: newPass });
+      setMsg({ type: 'success', text: 'Password berhasil direset! Silakan login dengan password baru.' });
+      setTimeout(onClose, 2000);
+    } catch (err) {
+      setMsg({ type: 'error', text: err.response?.data?.detail || 'Kode tidak valid atau kadaluarsa.' });
+    } finally { setLoading(false); }
+  };
+
+  const inputSt = {
+    width: '100%', padding: '0.7rem 1rem',
+    background: '#f8fafc', border: '1.5px solid #e2e8f0',
+    borderRadius: '0.5rem', color: '#0f172a', fontSize: '0.9375rem',
+    outline: 'none', boxSizing: 'border-box', transition: 'border-color 0.2s',
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.4)', backdropFilter: 'blur(4px)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+      <div style={{ background: '#fff', borderRadius: '1rem', width: '100%', maxWidth: 420, padding: '2rem', boxShadow: '0 20px 60px rgba(0,0,0,0.25)', border: '1px solid #e2e8f0' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <KeyRound size={20} color="#0077b6" />
+            <h2 style={{ margin: 0, fontSize: '1.0625rem', fontWeight: 800, color: '#0f172a' }}>Lupa Password</h2>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: 4 }}>
+            <X size={18} />
+          </button>
+        </div>
+
+        {msg && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.65rem 0.875rem', background: msg.type === 'success' ? '#f0fdf4' : '#fff1f2', border: `1px solid ${msg.type === 'success' ? '#bbf7d0' : '#fecaca'}`, borderRadius: '0.5rem', color: msg.type === 'success' ? '#15803d' : '#b91c1c', fontSize: '0.8125rem', marginBottom: '1rem', fontWeight: 500 }}>
+            {msg.type === 'success' ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
+            {msg.text}
+          </div>
+        )}
+
+        {step === 1 && (
+          <>
+            <p style={{ color: '#64748b', fontSize: '0.875rem', margin: '0 0 1.25rem' }}>
+              Masukkan email akun Anda. Kami akan mengirimkan kode reset password.
+            </p>
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#64748b', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Email Akun</label>
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="contoh@email.com" style={inputSt}
+                onFocus={e => e.target.style.borderColor = '#0077b6'} onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
+            </div>
+            <button onClick={requestReset} disabled={loading} style={{ width: '100%', padding: '0.75rem', background: 'linear-gradient(135deg, #023e8a, #0077b6)', border: 'none', borderRadius: '0.5rem', color: '#fff', fontWeight: 700, fontSize: '0.9375rem', cursor: loading ? 'wait' : 'pointer' }}>
+              {loading ? 'Mengirim...' : 'Kirim Kode Reset'}
+            </button>
+          </>
+        )}
+
+        {step === 2 && (
+          <>
+            <p style={{ color: '#64748b', fontSize: '0.875rem', margin: '0 0 1.25rem' }}>
+              Masukkan kode 6-digit yang dikirim ke <strong>{email}</strong> dan buat password baru.
+            </p>
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#64748b', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Kode Reset</label>
+              <input value={token} onChange={e => setToken(e.target.value)} placeholder="123456" maxLength={10} style={inputSt}
+                onFocus={e => e.target.style.borderColor = '#0077b6'} onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
+            </div>
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#64748b', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Password Baru</label>
+              <div style={{ position: 'relative' }}>
+                <input type={showPass ? 'text' : 'password'} value={newPass} onChange={e => setNewPass(e.target.value)} placeholder="Min. 6 karakter" style={{ ...inputSt, paddingRight: '2.5rem' }}
+                  onFocus={e => e.target.style.borderColor = '#0077b6'} onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
+                <button type="button" onClick={() => setShowPass(!showPass)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
+                  {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button onClick={() => setStep(1)} style={{ flex: 1, padding: '0.75rem', background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: '0.5rem', color: '#475569', fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer' }}>Kembali</button>
+              <button onClick={doReset} disabled={loading} style={{ flex: 2, padding: '0.75rem', background: 'linear-gradient(135deg, #023e8a, #0077b6)', border: 'none', borderRadius: '0.5rem', color: '#fff', fontWeight: 700, fontSize: '0.875rem', cursor: loading ? 'wait' : 'pointer' }}>
+                {loading ? 'Menyimpan...' : 'Reset Password'}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function LoginPage({ onLogin }) {
   const [email, setEmail] = useState('');
@@ -12,6 +122,7 @@ export default function LoginPage({ onLogin }) {
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [showForgotModal, setShowForgotModal] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const successMsg = location.state?.message || '';
@@ -33,7 +144,7 @@ export default function LoginPage({ onLogin }) {
     try {
       const res = await api.post('/login', { email, password });
       setIsLoading(false);
-      localStorage.setItem('ocean_user', JSON.stringify({ id: res.data.id, name: res.data.name, email: res.data.email, no_hp: res.data.no_hp || '' }));
+      localStorage.setItem('ocean_user', JSON.stringify({ id: res.data.id, name: res.data.name || res.data.nama, email: res.data.email, picture: res.data.picture || null, no_hp: res.data.no_hp || '' }));
       if (rememberMe) {
         localStorage.setItem('ocean_remembered_email', email);
         localStorage.setItem('ocean_remembered_password', password);
@@ -225,7 +336,7 @@ export default function LoginPage({ onLogin }) {
                 Ingat Saya
               </label>
               <button type="button"
-                onClick={() => alert('Silakan hubungi administrator di admin@oceansmart.id')}
+                onClick={() => setShowForgotModal(true)}
                 style={{ background: 'none', border: 'none', color: '#0077b6', fontSize: '0.8125rem', fontWeight: 700, cursor: 'pointer', padding: 0 }}>
                 Lupa Password?
               </button>
@@ -302,6 +413,7 @@ export default function LoginPage({ onLogin }) {
           .login-left { display: none !important; }
         }
       `}</style>
+      {showForgotModal && <ForgotPasswordModal onClose={() => setShowForgotModal(false)} />}
     </div>
   );
 }

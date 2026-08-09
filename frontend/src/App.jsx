@@ -18,9 +18,7 @@ import BiotaFormPage from './pages/BiotaFormPage';
 import OperatorAccountFormPage from './pages/OperatorAccountFormPage';
 import ProfilePage from './pages/ProfilePage';
 import ChatbotWidget from './components/ChatbotWidget';
-import SimulatorBanner from './components/SimulatorBanner';
 import TermsPage from './pages/TermsPage';
-import SimulatorPage from './pages/SimulatorPage';
 import './index.css';
 
 // Layout pembungkus untuk halaman yang memerlukan autentikasi
@@ -29,7 +27,6 @@ const ProtectedLayout = ({ children }) => {
     <div className="app-layout">
       <Sidebar />
       <main className="main-content">
-        <SimulatorBanner />
         {children}
       </main>
       <ChatbotWidget />
@@ -54,9 +51,12 @@ function App() {
   useEffect(() => {
     const savedUser = localStorage.getItem('ocean_user');
     const savedRole = localStorage.getItem('ocean_role');
-    if (savedUser || savedRole) {
+    if (savedUser && savedRole) {
       setIsAuthenticated(true);
-      setUserRole(savedRole || 'pengguna');
+      setUserRole(savedRole);
+    } else {
+      setIsAuthenticated(false);
+      setUserRole('pengguna');
     }
   }, []);
 
@@ -86,16 +86,14 @@ function App() {
         <AlertProvider>
           <Routes>
             {/* Public Routes */}
-            <Route path="/" element={
-              isAuthenticated ? <Navigate to="/dashboard" /> : <LandingPage onDemoLogin={() => handleLogin('pengguna')} />
-            } />
+            <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={
               isAuthenticated ? <Navigate to="/dashboard" /> : <LoginPage onLogin={handleLogin} />
             } />
             <Route path="/register" element={
               isAuthenticated ? <Navigate to="/dashboard" /> : <RegisterPage />
             } />
-          <Route path="/terms" element={<TermsPage />} />
+            <Route path="/terms" element={<TermsPage />} />
 
           {/* Protected Routes — semua role */}
           <Route path="/dashboard" element={isAuthenticated ? <ProtectedLayout><Dashboard userRole={userRole} onLogout={handleLogout} /></ProtectedLayout> : <Navigate to="/login" />} />
@@ -106,8 +104,6 @@ function App() {
           <Route path="/biota" element={isAuthenticated ? <ProtectedLayout><BiotaPage /></ProtectedLayout> : <Navigate to="/login" />} />
           <Route path="/alerts" element={isAuthenticated ? <ProtectedLayout><AlertsPage /></ProtectedLayout> : <Navigate to="/login" />} />
           <Route path="/profile" element={isAuthenticated ? <ProtectedLayout><ProfilePage /></ProtectedLayout> : <Navigate to="/login" />} />
-          <Route path="/simulator" element={isAuthenticated ? <ProtectedLayout><SimulatorPage /></ProtectedLayout> : <Navigate to="/login" />} />
-
           {/* Operator-Only Routes */}
           <Route path="/operator" element={
             <OperatorRoute isAuthenticated={isAuthenticated} userRole={userRole}>

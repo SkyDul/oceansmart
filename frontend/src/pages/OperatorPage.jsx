@@ -2,9 +2,31 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Settings, Cpu, Fish, Plus, Trash2, Edit3, Wifi, WifiOff,
-  RefreshCw, Users, Shield, MapPin, Anchor, HelpCircle, Bell
+  RefreshCw, Users, Shield, MapPin, Anchor, HelpCircle, Bell,
+  AlertTriangle, CheckCircle2, AlertCircle
 } from 'lucide-react';
 import api from '../api';
+
+function ConfirmModal({ isOpen, title, message, onConfirm, onClose }) {
+  if (!isOpen) return null;
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.4)', backdropFilter: 'blur(4px)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+      <div style={{ background: '#fff', borderRadius: '1rem', width: '100%', maxWidth: 400, padding: '1.75rem', boxShadow: '0 20px 60px rgba(0,0,0,0.2)', border: '1px solid #e2e8f0' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+          <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#fff1f2', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#dc2626', flexShrink: 0 }}>
+            <AlertTriangle size={20} />
+          </div>
+          <h3 style={{ margin: 0, fontSize: '1.0625rem', fontWeight: 800, color: '#0f172a' }}>{title || 'Konfirmasi Hapus'}</h3>
+        </div>
+        <p style={{ color: '#64748b', fontSize: '0.875rem', margin: '0 0 1.5rem', lineHeight: 1.5 }}>{message}</p>
+        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+          <button onClick={onClose} style={{ padding: '0.6rem 1.1rem', background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: '0.5rem', color: '#475569', fontWeight: 700, fontSize: '0.8125rem', cursor: 'pointer' }}>Batal</button>
+          <button onClick={() => { onConfirm(); onClose(); }} style={{ padding: '0.6rem 1.25rem', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '0.5rem', fontWeight: 700, fontSize: '0.8125rem', cursor: 'pointer', boxShadow: '0 4px 12px rgba(220,38,38,0.25)' }}>Hapus</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function OperatorPage() {
   const navigate = useNavigate();
@@ -18,7 +40,9 @@ export default function OperatorPage() {
 
   // States for Operator Management (Admin only)
   const [operators, setOperators] = useState([]);
-  const [loadingOperators, setLoadingOperators] = useState(false);
+  const [loadingOperators, setLoadingOperators] = useState(true);
+  const [deleteModal, setDeleteModal] = useState(null);
+  const [toast, setToast] = useState(null);
 
   // Filter states for Sensor tab
   const [filterProvinsi, setFilterProvinsi] = useState('all');
@@ -38,30 +62,50 @@ export default function OperatorPage() {
     return matchProv && matchWil;
   });
 
-  // ── Fetch dari backend ──
-  const fetchSensors = () => {
-    setLoadingSensors(true);
-    api.get('/sensors')
-      .then(res => setSensors(res.data))  // Backend already filters by role via X-User-Wilayah header
-      .catch(() => {})
-      .finally(() => setLoadingSensors(false));
+  const showToast = (type, msg) => {
+    setToast({ type, msg });
+    setTimeout(() => setToast(null), 3500);
   };
 
-  const fetchSpecies = () => {
-    setLoadingSpecies(true);
-    api.get('/biota')
-      .then(res => setSpecies(res.data))
-      .catch(() => {})
-      .finally(() => setLoadingSpecies(false));
+  const fetchSensors = async () => {
+    try {
+      setLoadingSensors(true);
+      const res = await api.get('/sensors');
+      let data = res.data;
+      if (userRole === 'operator' && userWilayah) {
+        data = data.filter(s => s.wilayah === userWilayah);
+      }
+      setSensors(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingSensors(false);
+    }
   };
 
-  const fetchOperators = () => {
+  const fetchSpecies = async () => {
+    try {
+      setLoadingSpecies(true);
+      const res = await api.get('/biota');
+      setSpecies(res.data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingSpecies(false);
+    }
+  };
+
+  const fetchOperators = async () => {
     if (userRole !== 'admin') return;
-    setLoadingOperators(true);
-    api.get('/operators')
-      .then(res => setOperators(res.data))
-      .catch(() => {})
-      .finally(() => setLoadingOperators(false));
+    try {
+      setLoadingOperators(true);
+      const res = await api.get('/operators');
+      setOperators(res.data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingOperators(false);
+    }
   };
 
   useEffect(() => {
@@ -71,40 +115,63 @@ export default function OperatorPage() {
   }, []);
 
   // ── SENSOR HANDLERS ──
-  const handleDeleteSensor = async (s) => {
-    if (!window.confirm(`Hapus sensor "${s.nama_lokasi}"? Semua data readingnya akan ikut terhapus.`)) return;
-    try {
-      await api.delete(`/sensors/${s.sensor_id}/delete`);
-      fetchSensors();
-    } catch (e) {
-      alert('Gagal menghapus: ' + (e.response?.data?.detail || e.message));
-    }
+  const handleDeleteSensor = (s) => {
+    setDeleteModal({
+      title: 'Hapus Stasiun Sensor',
+      message: `Apakah Anda yakin ingin menghapus sensor "${s.nama_lokasi}" (${s.sensor_id})? Seluruh data telemetri akan ikut terhapus.`,
+      onConfirm: async () => {
+        try {
+          await api.delete(`/sensors/${s.sensor_id}/delete`);
+          showToast('success', `Sensor "${s.nama_lokasi}" berhasil dihapus.`);
+          fetchSensors();
+        } catch (e) {
+          showToast('error', 'Gagal menghapus sensor: ' + (e.response?.data?.detail || e.message));
+        }
+      }
+    });
   };
 
   // ── BIOTA HANDLERS ──
-  const handleDeleteSpecies = async (s) => {
-    if (!window.confirm(`Hapus spesies "${s.nama_umum}"?`)) return;
-    try {
-      await api.delete(`/biota/${s.biota_id}/delete`);
-      fetchSpecies();
-    } catch (e) {
-      alert('Gagal menghapus: ' + (e.response?.data?.detail || e.message));
-    }
+  const handleDeleteSpecies = (s) => {
+    setDeleteModal({
+      title: 'Hapus Spesies Biota',
+      message: `Apakah Anda yakin ingin menghapus spesies "${s.nama_umum}"?`,
+      onConfirm: async () => {
+        try {
+          await api.delete(`/biota/${s.biota_id}/delete`);
+          showToast('success', `Biota "${s.nama_umum}" berhasil dihapus.`);
+          fetchSpecies();
+        } catch (e) {
+          showToast('error', 'Gagal menghapus biota: ' + (e.response?.data?.detail || e.message));
+        }
+      }
+    });
   };
 
   // ── OPERATOR HANDLERS (Admin Only) ──
-  const handleDeleteOp = async (op) => {
-    if (!window.confirm(`Hapus operator "${op.nama}"?`)) return;
-    try {
-      await api.delete(`/operators/${op.id}`);
-      fetchOperators();
-    } catch (e) {
-      alert('Gagal menghapus: ' + (e.response?.data?.detail || e.message));
-    }
+  const handleDeleteOp = (op) => {
+    setDeleteModal({
+      title: 'Hapus Akun Operator',
+      message: `Apakah Anda yakin ingin menghapus operator "${op.nama}" (${op.email})?`,
+      onConfirm: async () => {
+        try {
+          await api.delete(`/operators/${op.id}`);
+          showToast('success', `Operator "${op.nama}" berhasil dihapus.`);
+          fetchOperators();
+        } catch (e) {
+          showToast('error', 'Gagal menghapus operator: ' + (e.response?.data?.detail || e.message));
+        }
+      }
+    });
   };
 
   return (
     <div style={{ padding: '2.5rem', minHeight: '100vh', background: '#f8fafc' }}>
+      <ConfirmModal 
+        isOpen={!!deleteModal} 
+        onClose={() => setDeleteModal(null)} 
+        {...deleteModal} 
+      />
       {/* Header Panel */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 20, marginBottom: '2.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -673,6 +740,12 @@ export default function OperatorPage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+      {toast && (
+        <div style={{ position: 'fixed', bottom: 24, right: 24, background: toast.type === 'success' ? '#10b981' : '#ef4444', color: '#fff', padding: '0.875rem 1.5rem', borderRadius: '0.625rem', display: 'flex', alignItems: 'center', gap: 10, boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 99999 }}>
+          {toast.type === 'success' ? <CheckCircle2 size={17} /> : <AlertCircle size={17} />}
+          <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>{toast.msg}</span>
         </div>
       )}
     </div>

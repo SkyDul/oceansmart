@@ -96,7 +96,7 @@ export default function Dashboard() {
       Promise.all([
         api.get('/dashboard/summary'),
         api.get('/sensors'),
-        api.get('/alerts?active_only=true&limit=10'),
+        api.get('/alerts?limit=30'),
       ])
         .then(([sumRes, senRes, alertRes]) => {
           setSummary(sumRes.data);
@@ -108,9 +108,9 @@ export default function Dashboard() {
     };
 
     fetchData();
-    const interval = setInterval(fetchData, 10000);
+    const interval = setInterval(fetchData, 8000);
     return () => clearInterval(interval);
-  }, [selectedProvince]);
+  }, []);
 
   // Save selected regions to local storage
   useEffect(() => {
@@ -188,9 +188,11 @@ export default function Dashboard() {
     ? Math.round(activeSensors.reduce((sum, s) => sum + (s.latest_reading?.health_index || 80), 0) / activeSensors.length) 
     : 80;
   
-  const activeAlertsCount = selectedProvince === 'jabar'
-    ? alerts.filter(a => activeSensors.some(s => s.sensor_id === a.sensor_id)).length
-    : activeSensors.filter(s => (s.latest_reading?.health_index || 80) < 65).length;
+  const displayAlerts = selectedProvince === 'all' 
+    ? alerts 
+    : alerts.filter(a => activeSensors.some(s => s.sensor_id === a.sensor_id));
+    
+  const activeAlertsCount = displayAlerts.filter(a => !a.is_resolved).length || displayAlerts.length;
 
   const health = getHealthLabel(avgHealthIndex);
 
@@ -476,54 +478,70 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Recent Alerts */}
+          {/* Recent Alerts Log */}
           <div className="card">
-            <div className="card-header">
-              <h3><AlertTriangle size={16} style={{ marginRight: 8, verticalAlign: 'middle' }} />Log Peringatan Terbaru</h3>
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, fontSize: '0.9375rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <AlertTriangle size={16} color="#dc2626" /> Log Peringatan Terbaru
+              </h3>
               <button className="btn btn-ghost btn-sm" onClick={() => navigate('/alerts')}>Lihat Semua</button>
             </div>
-            <div className="card-body" style={{ padding: '0.5rem 1rem', maxHeight: 260, overflowY: 'auto' }}>
-              {selectedProvince === 'jabar' ? (
-                alerts.length === 0 ? (
-                  <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--on-surface-muted)', fontSize: '0.875rem' }}>
-                    Tidak ada peringatan aktif saat ini
-                  </div>
-                ) : (
-                  alerts.slice(0, 5).map(a => (
-                    <div key={a.id} className="alert-item">
-                      <div className={`alert-dot ${a.level}`} />
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: '0.8125rem', fontWeight: 600 }}>{a.sensor_id}</div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--on-surface-variant)' }}>{a.message}</div>
-                        <div style={{ fontSize: '0.6875rem', color: 'var(--on-surface-muted)', marginTop: 4 }}>
+            <div className="card-body" style={{ padding: '0.6rem 1rem', maxHeight: 260, overflowY: 'auto' }}>
+              {(() => {
+                const list = (displayAlerts.length > 0 ? displayAlerts : alerts);
+                if (list.length === 0) {
+                  return (
+                    <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--on-surface-muted)', fontSize: '0.875rem' }}>
+                      Tidak ada catatan log peringatan saat ini.
+                    </div>
+                  );
+                }
+                const sorted = [...list].sort((a, b) => {
+                  if (!a.is_resolved && b.is_resolved) return -1;
+                  if (a.is_resolved && !b.is_resolved) return 1;
+                  return new Date(b.created_at) - new Date(a.created_at);
+                });
+                return sorted.slice(0, 6).map(a => {
+                  const sensorObj = sensors.find(s => s.sensor_id === a.sensor_id);
+                  const sLoc = sensorObj ? sensorObj.nama_lokasi : a.sensor_id;
+                  const isDanger = a.level === 'bahaya';
+                  const isResolved = a.is_resolved;
+                  const dotColor = isResolved ? '#94a3b8' : (isDanger ? '#dc2626' : '#d97706');
+                  const borderCol = isResolved ? '#cbd5e1' : (isDanger ? '#fecdd3' : '#fef3c7');
+                  const bgCol = isResolved ? '#f8fafc' : (isDanger ? '#fff1f2' : '#fffbeb');
+                  const badgeCol = isResolved ? '#94a3b8' : (isDanger ? '#dc2626' : '#d97706');
+                  
+                  return (
+                    <div key={a.id} className="alert-item" style={{
+                      padding: '0.55rem 0.75rem',
+                      marginBottom: '0.45rem',
+                      borderRadius: '0.5rem',
+                      border: `1px solid ${borderCol}`,
+                      background: bgCol,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.75rem',
+                      opacity: isResolved ? 0.75 : 1
+                    }}>
+                      <div className={`alert-dot ${a.level}`} style={{ width: 8, height: 8, borderRadius: '50%', background: dotColor, flexShrink: 0 }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#0f172a', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sLoc}</span>
+                          <span className={`badge badge-${a.level}`} style={{
+                            padding: '2px 8px', borderRadius: 12, fontSize: '0.65rem', fontWeight: 800,
+                            textTransform: 'uppercase',
+                            background: badgeCol, color: '#fff'
+                          }}>{isResolved ? 'Selesai' : a.level}</span>
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#334155', marginTop: 2 }}>{a.message}</div>
+                        <div style={{ fontSize: '0.6875rem', color: '#64748b', marginTop: 3 }}>
                           {a.created_at ? new Date(a.created_at).toLocaleString('id-ID') : ''}
                         </div>
                       </div>
-                      <span className={`badge badge-${a.level}`}>{a.level}</span>
                     </div>
-                  ))
-                )
-              ) : (
-                // Dummy alerts for other provinces if any sensor has low health
-                activeSensors.filter(s => (s.latest_reading?.health_index || 80) < 78).map((s, idx) => (
-                  <div key={idx} className="alert-item">
-                    <div className="alert-dot waspada" />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: '0.8125rem', fontWeight: 600 }}>{s.sensor_id}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--on-surface-variant)' }}>Suhu laut terdeteksi mendekati ambang batas atas aman.</div>
-                      <div style={{ fontSize: '0.6875rem', color: 'var(--on-surface-muted)', marginTop: 4 }}>
-                        {new Date().toLocaleString('id-ID')}
-                      </div>
-                    </div>
-                    <span className="badge badge-waspada">waspada</span>
-                  </div>
-                ))
-              )}
-              {selectedProvince !== 'jabar' && activeSensors.filter(s => (s.latest_reading?.health_index || 80) < 78).length === 0 && (
-                <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--on-surface-muted)', fontSize: '0.875rem' }}>
-                  Semua parameter di wilayah {PROVINCES.find(p => p.id === selectedProvince)?.name} dalam batas aman
-                </div>
-              )}
+                  );
+                });
+              })()}
             </div>
           </div>
         </div>

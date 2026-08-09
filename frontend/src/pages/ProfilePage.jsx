@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   User, Mail, Lock, CheckCircle2, MapPin, Phone, Calendar,
-  Shield, Save, Eye, EyeOff, KeyRound, X, AlertCircle
+  Shield, Save, Eye, EyeOff, KeyRound, X, AlertCircle, Camera
 } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../api';
@@ -231,8 +231,29 @@ export default function ProfilePage() {
     if (userStr) {
       try {
         const userObj = JSON.parse(userStr);
+        const displayName = userObj.name || userObj.nama || '';
         setUserData(userObj);
-        setForm({ nama: userObj.name || '', email: userObj.email || '', no_hp: userObj.no_hp || '' });
+        setForm({ nama: displayName, email: userObj.email || '', no_hp: userObj.no_hp || '' });
+
+        if (userObj.id) {
+          api.get(`/users/${userObj.id}/profile`)
+            .then(res => {
+              const profileData = res.data;
+              const updated = {
+                ...userObj,
+                id: profileData.id,
+                name: profileData.name || profileData.nama,
+                nama: profileData.name || profileData.nama,
+                email: profileData.email,
+                no_hp: profileData.no_hp || '',
+                picture: profileData.picture || userObj.picture || null,
+              };
+              setUserData(updated);
+              setForm({ nama: updated.name, email: updated.email, no_hp: updated.no_hp });
+              localStorage.setItem('ocean_user', JSON.stringify(updated));
+            })
+            .catch(err => console.error('Gagal mengambil data profil:', err));
+        }
       } catch (e) { console.error(e); }
     } else { navigate('/login'); }
   }, [navigate]);
@@ -240,6 +261,22 @@ export default function ProfilePage() {
   const showToast = (type, msg) => {
     setToast({ type, msg });
     setTimeout(() => setToast(null), 3500);
+  };
+
+  const handlePhotoUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('error', 'Ukuran foto maksimal 5MB.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const base64 = evt.target.result;
+      setImgError(false);
+      setUserData(prev => ({ ...prev, picture: base64 }));
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSave = async (e) => {
@@ -254,12 +291,16 @@ export default function ProfilePage() {
         nama: form.nama,
         email: form.email,
         no_hp: form.no_hp,
+        picture: userData.picture || null,
       });
+      const updatedUser = res.data.user;
       const updated = {
         ...userData,
-        name:  res.data.user.name,
-        email: res.data.user.email,
-        no_hp: res.data.user.no_hp,
+        name:  updatedUser.name || updatedUser.nama,
+        nama:  updatedUser.name || updatedUser.nama,
+        email: updatedUser.email,
+        no_hp: updatedUser.no_hp,
+        picture: updatedUser.picture || null,
       };
       localStorage.setItem('ocean_user', JSON.stringify(updated));
       setUserData(updated);
@@ -313,6 +354,22 @@ export default function ProfilePage() {
                 {initial}
               </div>
             )}
+
+            <label style={{
+              position: 'absolute', bottom: -4, right: -4,
+              width: 32, height: 32, borderRadius: '50%',
+              background: '#0369a1', border: '2px solid #fff',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', color: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+              transition: 'transform 0.15s'
+            }}
+            title="Ubah Foto Profil"
+            onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.1)'}
+            onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+            >
+              <Camera size={15} />
+              <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handlePhotoUpload} />
+            </label>
           </div>
 
           {/* Name & handle */}

@@ -12,11 +12,11 @@ from app.models import Sensor, SensorReading, Alert, Biota, ConservationZone, Us
 # -------------------- THRESHOLDS --------------------
 
 THRESHOLDS = {
-    "ph":            {"min": 7.5, "max": 8.5, "warn_min": 7.7, "warn_max": 8.3},
-    "suhu_celsius":  {"min": 26,  "max": 30,  "warn_min": 26.5,"warn_max": 29.5},
-    "salinitas_ppt": {"min": 30,  "max": 35,  "warn_min": 30.5,"warn_max": 34.5},
-    "do_mg_l":       {"min": 5,   "max": 12,  "warn_min": 5.5, "warn_max": 11},
-    "kekeruhan_ntu": {"min": 0,   "max": 10,  "warn_min": 0,   "warn_max": 7},
+    "ph":            {"min": 7.0, "max": 8.8, "warn_min": 7.3, "warn_max": 8.6},
+    "suhu_celsius":  {"min": 24.0, "max": 33.0, "warn_min": 25.0, "warn_max": 31.5},
+    "salinitas_ppt": {"min": 26.0, "max": 38.0, "warn_min": 28.0, "warn_max": 36.5},
+    "do_mg_l":       {"min": 4.0, "max": 14.0, "warn_min": 4.8, "warn_max": 13.0},
+    "kekeruhan_ntu": {"min": 0.0, "max": 25.0, "warn_min": 0.0, "warn_max": 18.0},
 }
 
 # Karakteristik dasar tiap wilayah — berpengaruh ke base value generator
@@ -142,6 +142,15 @@ BIOTA_DATA = [
     {"biota_id": "BIO-0015", "nama_umum": "Hiu Banteng", "nama_ilmiah": "Carcharhinus leucas", "zona_kedalaman": "0-15m", "status_konservasi": "Vulnerable", "deskripsi": "Hiu bertubuh kekar dengan moncong tumpul. Salah satu hiu paling adaptif — mampu hidup di perairan laut maupun tawar. Dikenal agresif dan sering mendekati kawasan pesisir.", "habitat": "Muara, laguna, perairan dangkal pesisir", "foto_url": "/images/biota/bull_shark.jpg"},
     {"biota_id": "BIO-0016", "nama_umum": "Lobster Mutiara", "nama_ilmiah": "Panulirus ornatus", "zona_kedalaman": "15-30m", "status_konservasi": "Near Threatened", "deskripsi": "Lobster besar bercorak mutiara indah yang hidup di dasar karang dan celah batu. Komoditas perikanan bernilai tinggi di perairan tropis Indonesia.", "habitat": "Dasar karang, celah batu, slope dalam", "foto_url": "/images/biota/lobster.jpg"},
     {"biota_id": "BIO-0017", "nama_umum": "Ikan Todak", "nama_ilmiah": "Xiphias gladius", "zona_kedalaman": "5-30m", "status_konservasi": "Least Concern", "deskripsi": "Ikan pelagis besar dengan moncong rahang atas yang memanjang menyerupai pedang. Perenang cepat dan predator tangguh di perairan laut terbuka tropis hingga subtropis.", "habitat": "Perairan laut lepas, zona pelagis", "foto_url": "/images/biota/swordfish.jpg"},
+    {"biota_id": "BIO-0018", "nama_umum": "Ikan Sungut Ganda (Anglerfish)", "nama_ilmiah": "Lophiiformes", "zona_kedalaman": "15-30m", "status_konservasi": "Least Concern", "deskripsi": "Ikan laut dalam unik dengan organ bioluminesensi penggantung di atas kepala untuk memikat mangsa.", "habitat": "Dasar laut dalam, abyss", "foto_url": "/images/biota/anglerfish.jpg"},
+    {"biota_id": "BIO-0019", "nama_umum": "Kerapu Sunu (Coral Grouper)", "nama_ilmiah": "Plectropomus leopardus", "zona_kedalaman": "5-15m", "status_konservasi": "Least Concern", "deskripsi": "Ikan kerapu merah dengan bintik biru mencolok, predator karang bernilai ekonomi tinggi.", "habitat": "Terumbu karang, lereng luar", "foto_url": "/images/biota/grouper.jpg"},
+    {"biota_id": "BIO-0020", "nama_umum": "Lumba-lumba Botol", "nama_ilmiah": "Tursiops truncatus", "zona_kedalaman": "0-5m", "status_konservasi": "Least Concern", "deskripsi": "Mamalia laut sangat cerdas yang sering bersosialisasi dan melompat indah di permukaan pesisir.", "habitat": "Pesisir, laut lepas", "foto_url": "/images/biota/dolphin.jpg"},
+    {"biota_id": "BIO-0021", "nama_umum": "Hiu Goblin", "nama_ilmiah": "Mitsukurina owstoni", "zona_kedalaman": "15-30m", "status_konservasi": "Least Concern", "deskripsi": "Hiu fosil hidup laut dalam yang memiliki moncong panjang pipih dan rahang elastis penjangkau mangsa.", "habitat": "Laut dalam, slope benua", "foto_url": "/images/biota/goblin_shark.jpg"},
+    {"biota_id": "BIO-0022", "nama_umum": "Ikan Kembung", "nama_ilmiah": "Rastrelliger kanagurta", "zona_kedalaman": "0-5m", "status_konservasi": "Least Concern", "deskripsi": "Ikan pelagis kecil perenang cepat dalam koloni besar, sumber konsumsi protein utama masyarakat pesisir.", "habitat": "Perairan pesisir, neritik", "foto_url": "/images/biota/mackerel.jpg"},
+    {"biota_id": "BIO-0023", "nama_umum": "Ikan Gramma Kerajaan", "nama_ilmiah": "Gramma loreto", "zona_kedalaman": "0-5m", "status_konservasi": "Least Concern", "deskripsi": "Ikan karang hias mungil dwiwarna ungu dan kuning terang, sering berlindung di celah terumbu karang.", "habitat": "Gua karang, dinding terumbu", "foto_url": "/images/biota/royal_gramma.jpg"},
+    {"biota_id": "BIO-0024", "nama_umum": "Bulu Babi", "nama_ilmiah": "Diadema setosum", "zona_kedalaman": "0-5m", "status_konservasi": "Least Concern", "deskripsi": "Invertebrata pemakan alga dengan duri-duri tajam panjang yang menjaga kebersihan terumbu karang.", "habitat": "Rubble, dasar karang", "foto_url": "/images/biota/sea_urchin.jpg"},
+    {"biota_id": "BIO-0025", "nama_umum": "Ikan Turbot", "nama_ilmiah": "Scophthalmus maximus", "zona_kedalaman": "15-30m", "status_konservasi": "Least Concern", "deskripsi": "Ikan demersal pipih besar yang tersamar sempurna dengan dasar laut berpasir dan lumpur.", "habitat": "Substrat pasir, dasar laut", "foto_url": "/images/biota/turbot.jpg"},
+    {"biota_id": "BIO-0026", "nama_umum": "Paus Biru", "nama_ilmiah": "Balaenoptera musculus", "zona_kedalaman": "0-15m", "status_konservasi": "Endangered", "deskripsi": "Hewan terbesar di bumi, mamalia laut raksasa penyaring krill yang melintasi samudera terbuka.", "habitat": "Samudera pelagis", "foto_url": "/images/biota/blue_whale.jpg"},
 ]
 
 

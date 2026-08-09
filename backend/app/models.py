@@ -65,6 +65,7 @@ class User(Base):
     wilayah = Column(String(100), nullable=True)
     google_id = Column(String(255), unique=True, nullable=True, index=True)
     no_hp = Column(String(50), nullable=True)
+    foto_url = Column(Text, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
 
 class Sensor(Base):

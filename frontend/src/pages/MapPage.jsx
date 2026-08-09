@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polygon, CircleMarker, useMap } from 'react-leaflet';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Layers, Info, Search, Shield, Activity, ArrowRight, Radio, Compass } from 'lucide-react';
+import { MapPin, Layers, Info, Search, Shield, Activity, ArrowRight, Radio, Compass, Plus, Trash2, X } from 'lucide-react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import api from '../api';
@@ -62,6 +62,42 @@ export default function MapPage() {
   const userProv = localStorage.getItem('ocean_provinsi') || '';
   const userWilayah = localStorage.getItem('ocean_wilayah') || '';
 
+  const [customLegends, setCustomLegends] = useState(() => {
+    try {
+      const saved = localStorage.getItem('custom_gis_legends');
+      return saved ? JSON.parse(saved) : [
+        { id: '1', title: 'Pos Pengawasan Kelautan Utama', category: 'Pos Pantau', color: '#0284c7', description: 'Fasilitas pemantauan fisik & patroli keamanan kawasan.' },
+        { id: '2', title: 'Area Restorasi Karang Buatan', category: 'Rehabilitasi', color: '#7c3aed', description: 'Zona penanaman kembali bibit karang (transplantasi).' }
+      ];
+    } catch { return []; }
+  });
+
+  const [showAddLegendModal, setShowAddLegendModal] = useState(false);
+  const [newLegend, setNewLegend] = useState({ title: '', category: '', color: '#0284c7', description: '' });
+
+  const handleAddLegend = (e) => {
+    e.preventDefault();
+    if (!newLegend.title.trim() || !newLegend.description.trim()) return;
+    const item = {
+      id: `legend_${Date.now()}`,
+      title: newLegend.title,
+      category: newLegend.category || 'Informasi SIG',
+      color: newLegend.color || '#0284c7',
+      description: newLegend.description
+    };
+    const updated = [item, ...customLegends];
+    setCustomLegends(updated);
+    localStorage.setItem('custom_gis_legends', JSON.stringify(updated));
+    setNewLegend({ title: '', category: '', color: '#0284c7', description: '' });
+    setShowAddLegendModal(false);
+  };
+
+  const handleDeleteLegend = (id) => {
+    const updated = customLegends.filter(c => c.id !== id);
+    setCustomLegends(updated);
+    localStorage.setItem('custom_gis_legends', JSON.stringify(updated));
+  };
+
   useEffect(() => {
     // Fetch wilayah list for dropdown
     api.get('/wilayah').then(res => setWilayahList(res.data)).catch(() => {});
@@ -100,8 +136,9 @@ export default function MapPage() {
   const filteredSensors = sensors.filter(s => {
     const matchesSearch = s.sensor_id.toLowerCase().includes(searchQuery.toLowerCase()) || s.nama_lokasi.toLowerCase().includes(searchQuery.toLowerCase());
     if (!matchesSearch) return false;
-    // Wilayah filter — use direct wilayah name matching
-    if (selectedWilayah && selectedWilayah !== 'all') {
+    if (userRole === 'operator' && userWilayah) {
+      if ((s.wilayah || '').toLowerCase() !== userWilayah.toLowerCase()) return false;
+    } else if (selectedWilayah && selectedWilayah !== 'all') {
       if ((s.wilayah || '').toLowerCase() !== selectedWilayah.toLowerCase()) return false;
     }
     return true;
@@ -120,8 +157,13 @@ export default function MapPage() {
         </div>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          {/* Dropdown Wilayah (hanya untuk Admin & Pengguna) */}
-          {userRole !== 'operator' && (
+          {/* Dropdown Wilayah (hanya untuk Admin & Pengguna) / Badge untuk Operator */}
+          {userRole === 'operator' ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: '#e0f2fe', border: '1px solid #bae6fd', borderRadius: '2rem', padding: '0.35rem 0.85rem' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#0369a1' }}>Wilayah Kerja:</span>
+              <span style={{ fontSize: '0.8125rem', fontWeight: 800, color: '#0369a1' }}>{userWilayah}</span>
+            </div>
+          ) : (
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
               <select 
                 className="select select-sm select-bordered" 
@@ -511,12 +553,125 @@ export default function MapPage() {
                 </div>
               </div>
 
+              {/* Legenda & Informasi Tambahan (Admin & Operator) */}
+              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '1.25rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Compass size={18} color="#023e8a" />
+                    <h3 style={{ fontSize: '0.9375rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Legenda & Catatan SIG</h3>
+                  </div>
+                  {(userRole === 'admin' || userRole === 'operator') && (
+                    <button
+                      onClick={() => setShowAddLegendModal(true)}
+                      style={{ padding: '0.35rem 0.75rem', background: 'linear-gradient(135deg, #023e8a, #0077b6)', color: '#fff', border: 'none', borderRadius: '0.5rem', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                    >
+                      <Plus size={13} /> Tambah
+                    </button>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                  {customLegends.length === 0 ? (
+                    <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontStyle: 'italic', padding: '0.5rem 0' }}>Belum ada legenda tambahan.</div>
+                  ) : (
+                    customLegends.map(c => (
+                      <div key={c.id} style={{ padding: '0.65rem 0.75rem', borderRadius: '0.5rem', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                          <div style={{ width: 12, height: 12, borderRadius: '50%', background: c.color, marginTop: 3, flexShrink: 0 }} />
+                          <div>
+                            <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#0f172a' }}>{c.title}</div>
+                            <span style={{ fontSize: '0.65rem', fontWeight: 700, color: c.color, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{c.category}</span>
+                            <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '2px 0 0', lineHeight: 1.3 }}>{c.description}</p>
+                          </div>
+                        </div>
+                        {(userRole === 'admin' || userRole === 'operator') && (
+                          <button onClick={() => handleDeleteLegend(c.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 2 }}>
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
             </div>
           )}
 
         </div>
 
       </div>
+
+      {/* Modal Tambah Legenda / Informasi SIG */}
+      {showAddLegendModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div style={{ background: '#fff', borderRadius: '1rem', width: '100%', maxWidth: 440, padding: '1.75rem', boxShadow: '0 20px 50px rgba(0,0,0,0.2)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Compass size={20} color="#023e8a" />
+                <h3 style={{ margin: 0, fontSize: '1.0625rem', fontWeight: 800, color: '#0f172a' }}>Tambah Legenda & Info SIG</h3>
+              </div>
+              <button onClick={() => setShowAddLegendModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddLegend} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#64748b', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Judul Informasi / Legenda</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Contoh: Pos Pengawasan Karangsambung"
+                  value={newLegend.title}
+                  onChange={e => setNewLegend({ ...newLegend, title: e.target.value })}
+                  style={{ width: '100%', padding: '0.65rem 0.85rem', background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '0.5rem', fontSize: '0.875rem', color: '#0f172a', outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#64748b', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Kategori / Tipe</label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: Pos Pantau / Area Konservasi"
+                    value={newLegend.category}
+                    onChange={e => setNewLegend({ ...newLegend, category: e.target.value })}
+                    style={{ width: '100%', padding: '0.65rem 0.85rem', background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '0.5rem', fontSize: '0.875rem', color: '#0f172a', outline: 'none', boxSizing: 'border-box' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#64748b', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Warna Indikator</label>
+                  <input
+                    type="color"
+                    value={newLegend.color}
+                    onChange={e => setNewLegend({ ...newLegend, color: e.target.value })}
+                    style={{ width: '100%', height: 38, border: '1.5px solid #e2e8f0', borderRadius: '0.5rem', cursor: 'pointer', padding: 2, background: '#f8fafc' }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#64748b', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Deskripsi & Catatan</label>
+                <textarea
+                  required
+                  rows={3}
+                  placeholder="Penjelasan ringkas lokasi / fasilitas / legenda peta..."
+                  value={newLegend.description}
+                  onChange={e => setNewLegend({ ...newLegend, description: e.target.value })}
+                  style={{ width: '100%', padding: '0.65rem 0.85rem', background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '0.5rem', fontSize: '0.875rem', color: '#0f172a', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                <button type="button" onClick={() => setShowAddLegendModal(false)} style={{ padding: '0.65rem 1.1rem', background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: '0.5rem', color: '#475569', fontWeight: 700, fontSize: '0.8125rem', cursor: 'pointer' }}>Batal</button>
+                <button type="submit" style={{ padding: '0.65rem 1.25rem', background: 'linear-gradient(135deg, #023e8a, #0077b6)', color: '#fff', border: 'none', borderRadius: '0.5rem', fontWeight: 700, fontSize: '0.8125rem', cursor: 'pointer' }}>Simpan Legenda</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );

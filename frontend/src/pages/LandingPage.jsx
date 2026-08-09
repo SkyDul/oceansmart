@@ -5,7 +5,7 @@ import { ArrowRight, Shield, Activity, Globe, Anchor, Camera, Cpu, Users, Home }
 import { useEffect, useState } from 'react';
 import api from '../api';
 
-export default function LandingPage({ onDemoLogin }) {
+export default function LandingPage() {
   const [scrolled, setScrolled] = useState(false);
   const [stats, setStats] = useState({
     totalZones: 4,
@@ -103,21 +103,6 @@ export default function LandingPage({ onDemoLogin }) {
             <Link 
               to="/login" 
               style={{ 
-                color: scrolled ? '#515154' : 'rgba(255, 255, 255, 0.85)', 
-                fontSize: '0.875rem', 
-                fontWeight: 500, 
-                textDecoration: 'none', 
-                transition: 'color 0.2s' 
-              }} 
-              onMouseEnter={e => e.target.style.color = scrolled ? '#023e8a' : '#ffffff'} 
-              onMouseLeave={e => e.target.style.color = scrolled ? '#515154' : 'rgba(255, 255, 255, 0.85)'}
-            >
-              Masuk
-            </Link>
-            <Link 
-              to="/dashboard" 
-              onClick={onDemoLogin} 
-              style={{ 
                 background: scrolled ? '#023e8a' : '#ffffff', 
                 color: scrolled ? '#ffffff' : '#023e8a', 
                 border: 'none', 
@@ -146,8 +131,9 @@ export default function LandingPage({ onDemoLogin }) {
                 }
               }}
             >
-              Mulai Demo
+              Masuk
             </Link>
+
           </div>
         </div>
       </nav>
@@ -225,8 +211,7 @@ export default function LandingPage({ onDemoLogin }) {
           </p>
           <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem' }}>
             <Link 
-              to="/dashboard" 
-              onClick={onDemoLogin} 
+              to="/login" 
               style={{ 
                 background: '#ffffff', 
                 color: '#023e8a', 
@@ -241,9 +226,10 @@ export default function LandingPage({ onDemoLogin }) {
               onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.background = '#f5f5f7'; }}
               onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.background = '#ffffff'; }}
             >
-              Mulai Demo Sekarang
+              Masuk
             </Link>
           </div>
+
         </div>
       </section>
 

@@ -5,7 +5,7 @@ Marine Conservation Monitoring Platform
 from datetime import datetime, timedelta
 from typing import Optional, AsyncGenerator
 
-from fastapi import FastAPI, Depends, HTTPException, Query, Header
+from fastapi import FastAPI, Depends, HTTPException, Query, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -19,10 +19,25 @@ from fastapi.responses import StreamingResponse
 sse_clients = set()
 main_loop = None
 
+# Tracks sensors currently in danger/warning: key = "sensor_id_parameter" -> True
+# Cleared when sensor returns to normal (so next danger triggers a new notification)
+active_danger_states = {}
+
+# Tracks ongoing simulated anomalies per sensor: sensor_id -> {"anomaly_type": "heatwave", "remaining": 5}
+active_anomalies = {}
+
 def push_alert_to_clients(alert_dict):
+    """Broadcast alert to all SSE clients immediately (no cooldown — handled by active_danger_states)."""
     if not main_loop: return
     for client in list(sse_clients):
         asyncio.run_coroutine_threadsafe(client.put(alert_dict), main_loop)
+
+def push_resolved_to_clients(alert_dict):
+    """Broadcast a resolved event to all SSE clients."""
+    if not main_loop: return
+    resolved = {**alert_dict, "event_type": "resolved", "is_resolved": True}
+    for client in list(sse_clients):
+        asyncio.run_coroutine_threadsafe(client.put(resolved), main_loop)
 
 import httpx
 
@@ -61,7 +76,7 @@ def startup():
         
     Base.metadata.create_all(bind=engine)
     
-    # Auto-migration: check if no_hp column exists, if not add it
+    # Auto-migration: check if no_hp and foto_url columns exist, if not add them
     try:
         from sqlalchemy import text
         with engine.begin() as conn:
@@ -69,12 +84,37 @@ def startup():
             print("  [DB] Auto-migration: Added 'no_hp' column to 'users' table")
     except Exception as e:
         pass # Column already exists or table doesn't exist yet
+
+    try:
+        from sqlalchemy import text
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE users ADD COLUMN foto_url TEXT NULL"))
+            print("  [DB] Auto-migration: Added 'foto_url' column to 'users' table")
+    except Exception as e:
+        pass
         
     db = next(get_db())
     try:
         seed_database(db)
         upsert_new_biota(db)
         upsert_operators(db)
+        
+        # Sync admin user credentials
+        admin_acc = db.query(User).filter((User.email == "admin@oceansmart.id") | (User.nama == "oceansmart")).first()
+        if admin_acc:
+            admin_acc.nama = "oceansmart"
+            admin_acc.email = "admin@oceansmart.id"
+            admin_acc.password_hash = "ocean123"
+            admin_acc.role = "admin"
+            db.commit()
+        else:
+            db.add(User(
+                email="admin@oceansmart.id",
+                nama="oceansmart",
+                password_hash="ocean123",
+                role="admin"
+            ))
+            db.commit()
     finally:
         db.close()
         
@@ -85,62 +125,223 @@ def startup():
     def generate_realtime_data():
         db = next(get_db())
         try:
-            # Sinkronisasi parameter laut real-time Jawa Barat (Pangandaran)
+            # Sinkronisasi parameter laut real-time
             update_realtime_ocean_cache()
             
             now = datetime.utcnow()
-            # Fetch actual sensors from database
             db_sensors = db.query(Sensor).all()
-            for s in db_sensors:
-                # Skip sensor jika offline/maintenance
-                if s.status_koneksi != "online":
-                    continue
-                
-                # Check battery
-                if s.status_baterai <= 0:
-                    s.status_koneksi = "offline"
-                    db.commit()
-                    continue
-                
-                # Constant nominal battery usage
+            
+            # Count online sensors to enforce anomaly minimum
+            online_sensors = [s for s in db_sensors if s.status_koneksi == "online" and s.status_baterai > 0]
+            
+            # Clean active anomalies list of any deleted/offline sensors
+            online_ids = {s.sensor_id for s in online_sensors}
+            for sid in list(active_anomalies.keys()):
+                if sid not in online_ids:
+                    active_anomalies.pop(sid, None)
+                    
+            # Enforce at least 3 active anomalies at any time
+            min_anomalies = 3
+            current_anomalies_count = len(active_anomalies)
+            if len(online_sensors) > 0 and current_anomalies_count < min_anomalies:
+                needed = min_anomalies - current_anomalies_count
+                available = [s for s in online_sensors if s.sensor_id not in active_anomalies]
+                if available:
+                    import random
+                    chosen_sensors = random.sample(available, min(needed, len(available)))
+                    for s in chosen_sensors:
+                        anomaly_type = random.choice(["heatwave", "acidification", "storm"])
+                        active_anomalies[s.sensor_id] = {
+                            "anomaly_type": anomaly_type,
+                            "remaining": random.randint(3, 6) # lasts 30 to 60 seconds
+                        }
+            
+            for s in online_sensors:
+                # Nominal battery drain
                 s.status_baterai = max(0, s.status_baterai - 0.1)
                 
-                # Construct dict matching seeder config
                 sensor_dict = {
                     "sensor_id": s.sensor_id,
                     "zona": s.zona,
-                    "kedalaman_m": s.kedalaman_m
+                    "kedalaman_m": s.kedalaman_m,
+                    "wilayah": s.wilayah or "default",
                 }
                 
-                # Generate reading normally without global anomalies
-                reading = generate_reading(now, sensor_dict, 0, anomaly_type="normal")
+                # Determine anomaly type
+                anomaly = "normal"
+                del_later = False
+                if s.sensor_id in active_anomalies:
+                    state = active_anomalies[s.sensor_id]
+                    anomaly = state["anomaly_type"]
+                    state["remaining"] -= 1
+                    if state["remaining"] <= 0:
+                        del_later = True
+                else:
+                    import random
+                    # Random 2% chance to start new anomaly normally
+                    if random.random() < 0.02:
+                        anomaly = random.choice(["heatwave", "acidification", "storm"])
+                        active_anomalies[s.sensor_id] = {
+                            "anomaly_type": anomaly,
+                            "remaining": random.randint(3, 6)
+                        }
+                
+                reading = generate_reading(now, sensor_dict, 0, anomaly_type=anomaly)
                 db.add(SensorReading(**reading))
                 
-                alert_data = check_thresholds_and_create_alert(reading)
-                if alert_data:
-                    alert_data["created_at"] = now
-                    alert_data["is_resolved"] = False
-                    new_alert = Alert(**alert_data)
-                    db.add(new_alert)
-                    db.flush()
+                if del_later:
+                    active_anomalies.pop(s.sensor_id, None)
                     
-                    # Push to SSE clients
-                    alert_dict = {
-                        "id": new_alert.id,
-                        "sensor_id": new_alert.sensor_id,
-                        "parameter": new_alert.parameter,
-                        "value": new_alert.value,
-                        "threshold_min": new_alert.threshold_min,
-                        "threshold_max": new_alert.threshold_max,
-                        "level": new_alert.level,
-                        "message": new_alert.message,
-                        "created_at": new_alert.created_at.isoformat(),
-                        "is_resolved": new_alert.is_resolved
-                    }
-                    push_alert_to_clients(alert_dict)
+                # Ambil alert yang belum resolved untuk sensor ini
+                existing_unresolved = db.query(Alert).filter(
+                    Alert.sensor_id == s.sensor_id,
+                    Alert.is_resolved == False
+                ).all()
+
+                # Cek parameter secara independen
+                param_configs = [
+                    {"key": "ph", "label": "pH", "unit": ""},
+                    {"key": "suhu_celsius", "label": "Suhu", "unit": "°C"},
+                    {"key": "salinitas_ppt", "label": "Salinitas", "unit": " ppt"},
+                    {"key": "do_mg_l", "label": "Dissolved Oxygen", "unit": " mg/L"},
+                    {"key": "kekeruhan_ntu", "label": "Kekeruhan", "unit": " NTU"}
+                ]
+                
+                active_params_in_reading = set()
+                
+                for cfg in param_configs:
+                    r_key = cfg["key"]
+                    label = cfg["label"]
+                    unit = cfg["unit"]
+                    val = reading[r_key]
+                    
+                    th_key = r_key.replace("_celsius","").replace("_ppt","").replace("_mg_l","").replace("_ntu","")
+                    th = THRESHOLDS.get(th_key) or THRESHOLDS.get(r_key)
+                    if not th:
+                        continue
+                        
+                    lmin, lmax = th["min"], th["max"]
+                    wmin, wmax = th.get("warn_min", lmin), th.get("warn_max", lmax)
+                    
+                    alert_level = None
+                    alert_msg = None
+                    
+                    if val < lmin or val > lmax:
+                        alert_level = "bahaya"
+                        alert_msg = f"{label} bernilai {val}{unit}, di luar batas aman ({lmin}–{lmax})"
+                    elif val < wmin or val > wmax:
+                        alert_level = "waspada"
+                        direction = "mendekati batas bawah" if val < wmin else "mendekati batas atas"
+                        alert_msg = f"{label} bernilai {val}{unit}, {direction} aman ({lmin}–{lmax})"
+                        
+                    danger_key = f"{s.sensor_id}_{label}"
+                    
+                    if alert_level:
+                        active_params_in_reading.add(label)
+                        match_alert = next((a for a in existing_unresolved if a.parameter == label), None)
+                        
+                        if match_alert:
+                            # Update in-place
+                            match_alert.level = alert_level
+                            match_alert.value = val
+                            match_alert.message = alert_msg
+                            match_alert.is_resolved = False
+                            alert_obj = match_alert
+                        else:
+                            # Create new alert
+                            alert_obj = Alert(
+                                sensor_id=s.sensor_id,
+                                parameter=label,
+                                value=val,
+                                threshold_min=lmin,
+                                threshold_max=lmax,
+                                level=alert_level,
+                                message=alert_msg,
+                                created_at=now,
+                                is_resolved=False
+                            )
+                            db.add(alert_obj)
+                            db.flush()
+                            
+                        # Kirim notifikasi HANYA jika pertama kali bahaya
+                        was_already_in_danger = active_danger_states.get(danger_key, False)
+                        if not was_already_in_danger:
+                            active_danger_states[danger_key] = True
+                            alert_dict = {
+                                "id": alert_obj.id,
+                                "sensor_id": alert_obj.sensor_id,
+                                "parameter": alert_obj.parameter,
+                                "value": float(alert_obj.value),
+                                "threshold_min": alert_obj.threshold_min,
+                                "threshold_max": alert_obj.threshold_max,
+                                "level": alert_obj.level,
+                                "message": alert_obj.message,
+                                "created_at": alert_obj.created_at.isoformat() if alert_obj.created_at else now.isoformat(),
+                                "is_resolved": False
+                            }
+                            push_alert_to_clients(alert_dict)
+                        else:
+                            # Kirim silent update untuk update nilai real-time di UI
+                            db.flush()
+                            if alert_obj.id:
+                                update_dict = {
+                                    "id": alert_obj.id,
+                                    "sensor_id": alert_obj.sensor_id,
+                                    "parameter": alert_obj.parameter,
+                                    "value": float(alert_obj.value),
+                                    "threshold_min": alert_obj.threshold_min,
+                                    "threshold_max": alert_obj.threshold_max,
+                                    "level": alert_obj.level,
+                                    "message": alert_obj.message,
+                                    "created_at": alert_obj.created_at.isoformat() if alert_obj.created_at else now.isoformat(),
+                                    "is_resolved": False,
+                                    "event_type": "update"
+                                }
+                                push_alert_to_clients(update_dict)
+                
+                # Jika parameter kembali normal: auto-selesaikan alert yang ada.
+                # Update in-place (bukan buat riwayat baru) → tampil sebagai Terselesaikan (✅).
+                # Hapus dari active_danger_states → notifikasi baru muncul jika bahaya kembali.
+                for a in existing_unresolved:
+                    if a.parameter not in active_params_in_reading:
+                        danger_key = f"{s.sensor_id}_{a.parameter}"
+                        param_key_map = {
+                            "pH": "ph",
+                            "Suhu": "suhu_celsius",
+                            "Salinitas": "salinitas_ppt",
+                            "Dissolved Oxygen": "do_mg_l",
+                            "Kekeruhan": "kekeruhan_ntu"
+                        }
+                        r_key = param_key_map.get(a.parameter, "ph")
+                        normal_val = reading.get(r_key, a.value)
+                        # Update alert in-place → Terselesaikan
+                        a.is_resolved = True
+                        a.resolved_at = now
+                        a.level = "normal"
+                        a.value = normal_val
+                        a.message = f"{a.parameter} kembali ke kondisi Normal ({normal_val})"
+                        db.flush()
+                        # Kirim SSE resolved agar kartu langsung berubah hijau di frontend
+                        if active_danger_states.pop(danger_key, False):
+                            resolved_dict = {
+                                "id": a.id,
+                                "sensor_id": a.sensor_id,
+                                "parameter": a.parameter,
+                                "value": float(normal_val),
+                                "threshold_min": a.threshold_min,
+                                "threshold_max": a.threshold_max,
+                                "level": "normal",
+                                "message": a.message,
+                                "created_at": a.created_at.isoformat() if a.created_at else now.isoformat(),
+                                "is_resolved": True,
+                                "event_type": "resolved"
+                            }
+                            push_resolved_to_clients(resolved_dict)
+                    else:
+                        db.flush()
                     
             db.commit()
-            print(f"[Realtime] Data baru ditambahkan pada {now}")
+            print(f"[Realtime] Siklus 10s selesai: {now.strftime('%H:%M:%S')} | Bahaya aktif: {len(active_danger_states)}")
         except Exception as e:
             print("Error generating realtime data:", e)
             db.rollback()
@@ -164,26 +365,22 @@ def login_user(req: LoginSchema, db: Session = Depends(get_db)):
         (User.email == req.email) | (User.nama == req.email)
     ).first()
     
-    if req.email in ["admin", "admin@oceansmart.id"]:
-        return {
-            "id": user.id if user else 1,
-            "nama": user.nama if user else "Admin OceanSmart",
-            "email": req.email,
-            "role": "admin",
-            "wilayah": "",
-            "provinsi": ""
-        }
-    
     if not user:
-        raise HTTPException(status_code=400, detail="Pengguna tidak ditemukan. Periksa email atau password Anda.")
+        raise HTTPException(status_code=400, detail="Pengguna tidak ditemukan. Periksa email/username Anda.")
+        
+    if user.password_hash != req.password:
+        raise HTTPException(status_code=400, detail="Kata sandi salah. Silakan coba lagi.")
     
     return {
         "id": user.id,
         "nama": user.nama,
+        "name": user.nama,
         "email": user.email,
         "role": user.role,
         "wilayah": user.wilayah or "",
-        "provinsi": user.provinsi or ""
+        "provinsi": user.provinsi or "",
+        "no_hp": getattr(user, "no_hp", "") or "",
+        "picture": getattr(user, "foto_url", None)
     }
 
 
@@ -548,6 +745,7 @@ def delete_sensor(sensor_id: str, db: Session = Depends(get_db)):
     sensor = db.query(Sensor).filter(Sensor.sensor_id == sensor_id).first()
     if not sensor:
         raise HTTPException(status_code=404, detail="Sensor tidak ditemukan")
+    db.query(Alert).filter(Alert.sensor_id == sensor_id).delete()
     db.query(SensorReading).filter(SensorReading.sensor_id == sensor_id).delete()
     db.delete(sensor)
     db.commit()
@@ -592,6 +790,54 @@ def get_alerts(
         }
         for a in alerts
     ]
+
+
+@app.patch("/api/alerts/{alert_id}/resolve")
+def resolve_alert(alert_id: int, db: Session = Depends(get_db)):
+    """[Operator/Admin] Tandai peringatan sebagai selesai (manual oleh operator)."""
+    alert = db.query(Alert).filter(Alert.id == alert_id).first()
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert tidak ditemukan")
+    alert.is_resolved = True
+    alert.resolved_at = datetime.utcnow()
+    db.commit()
+    # Hapus dari tracking state agar notifikasi baru bisa muncul jika bahaya kembali
+    danger_key = f"{alert.sensor_id}_{alert.parameter}"
+    active_danger_states.pop(danger_key, None)
+    return {"message": "Peringatan berhasil diselesaikan", "id": alert_id}
+
+
+@app.get("/api/alerts/stream")
+async def alerts_stream(request: Request):
+    """Server-Sent Events stream untuk peringatan real-time."""
+    queue = asyncio.Queue()
+    sse_clients.add(queue)
+
+    async def event_generator():
+        try:
+            # Kirim sinyal koneksi berhasil
+            yield "data: {\"type\": \"connected\"}\n\n"
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    alert_dict = await asyncio.wait_for(queue.get(), timeout=20.0)
+                    yield f"data: {json.dumps(alert_dict)}\n\n"
+                except asyncio.TimeoutError:
+                    # Keepalive agar koneksi tidak terputus
+                    yield "data: {\"type\": \"ping\"}\n\n"
+        finally:
+            sse_clients.discard(queue)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        }
+    )
 
 
 # -------------------- BIOTA --------------------
@@ -1173,6 +1419,23 @@ def register_user(body: dict, db: Session = Depends(get_db)):
     db.refresh(new_user)
     return {"message": "Registrasi berhasil! Silakan masuk.", "email": email}
 
+@app.get("/api/users/{user_id}/profile")
+def get_user_profile(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User tidak ditemukan")
+    return {
+        "id": user.id,
+        "nama": user.nama,
+        "name": user.nama,
+        "email": user.email,
+        "role": user.role,
+        "provinsi": user.provinsi,
+        "wilayah": user.wilayah,
+        "no_hp": user.no_hp or "",
+        "picture": getattr(user, "foto_url", None)
+    }
+
 @app.put("/api/users/{user_id}/profile")
 def update_profile(user_id: int, body: dict, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == user_id).first()
@@ -1188,6 +1451,10 @@ def update_profile(user_id: int, body: dict, db: Session = Depends(get_db)):
         user.email = body["email"]
     if "no_hp" in body:
         user.no_hp = body["no_hp"]
+    if "foto_url" in body:
+        user.foto_url = body["foto_url"]
+    if "picture" in body:
+        user.foto_url = body["picture"]
     if "password" in body and body["password"]:
         user.password_hash = body["password"]
     
@@ -1198,11 +1465,13 @@ def update_profile(user_id: int, body: dict, db: Session = Depends(get_db)):
         "user": {
             "id": user.id,
             "name": user.nama,
+            "nama": user.nama,
             "email": user.email,
             "role": user.role,
             "provinsi": user.provinsi,
             "wilayah": user.wilayah,
-            "no_hp": user.no_hp
+            "no_hp": user.no_hp or "",
+            "picture": getattr(user, "foto_url", None)
         }
     }
 
@@ -1460,11 +1729,15 @@ def login_google(body: dict, db: Session = Depends(get_db)):
         db.commit()
         
     return {
+        "id": user.id,
         "name": user.nama,
+        "nama": user.nama,
         "email": user.email,
         "role": user.role,
         "provinsi": user.provinsi,
-        "wilayah": user.wilayah
+        "wilayah": user.wilayah,
+        "no_hp": user.no_hp or "",
+        "picture": getattr(user, "foto_url", None)
     }
 
 
@@ -1503,6 +1776,10 @@ def resolve_alert(
         
     alert.is_resolved = True
     db.commit()
+    
+    # Reset notified state so future breaches trigger a new notification
+    danger_key = f"{alert.sensor_id}_{alert.parameter}"
+    active_danger_states.pop(danger_key, None)
     
     # Notify clients that this alert is resolved
     alert_dict = {

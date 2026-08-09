@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { Layers, Thermometer, Droplets, Wind, Eye, Activity, Heart, Play, Pause, SkipBack, Fish, AlertTriangle, Sliders, MapPin, ChevronDown, CheckCircle2, Globe, Building2 } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Layers, Thermometer, Droplets, Wind, Eye, Activity, Heart, Play, Pause, SkipBack, Fish, AlertTriangle, Sliders, SlidersHorizontal, MapPin, ChevronDown, CheckCircle2, Globe, Building2, Flame, FlaskConical, CloudRain, Waves } from 'lucide-react';
 import '@google/model-viewer';
 import api from '../api';
 import { PROVINCES, KABUPATEN_BY_PROVINCE } from '../constants/regions';
@@ -21,6 +21,15 @@ import modelCrayfish from '../assets/models/Crayfish.glb';
 import modelGoldfish from '../assets/models/Goldfish.glb';
 import modelHalibut from '../assets/models/Halibut.glb';
 import modelBullShark from '../assets/models/shark.glb';
+import modelAnglerfish from '../assets/models/Anglerfish.glb';
+import modelCoralGrouper from '../assets/models/CoralGrouper.glb';
+import modelDolphin from '../assets/models/Dolphin.glb';
+import modelMackerel from '../assets/models/Mackerel.glb';
+import modelGoblinShark from '../assets/models/GoblinShark.glb';
+import modelRoyalGramma from '../assets/models/RoyalGramma.glb';
+import modelSeaUrchin from '../assets/models/SeaUrchin.glb';
+import modelTurbot from '../assets/models/Turbot.glb';
+import modelBlueWhale from '../assets/models/BlueWhale.glb';
 
 const MODEL_MAP = {
   'Ikan Badut (Nemo)': modelNemo,
@@ -40,8 +49,15 @@ const MODEL_MAP = {
   'Ikan Mas': modelGoldfish,
   'Ikan Sebelah (Halibut)': modelHalibut,
   'Hiu Banteng': modelBullShark,
-  'Hiu Paus': null,
-  'Dugong': null,
+  'Ikan Sungut Ganda (Anglerfish)': modelAnglerfish,
+  'Kerapu Sunu (Coral Grouper)': modelCoralGrouper,
+  'Lumba-lumba Botol': modelDolphin,
+  'Ikan Kembung': modelMackerel,
+  'Hiu Goblin': modelGoblinShark,
+  'Ikan Gramma Kerajaan': modelRoyalGramma,
+  'Bulu Babi': modelSeaUrchin,
+  'Ikan Turbot': modelTurbot,
+  'Paus Biru': modelBlueWhale,
 };
 
 
@@ -118,10 +134,10 @@ const DEPTH_LAYERS = [
 
 // Semua biota GLB tersebar merata ke tiap lapisan kedalaman
 const BIOTA_BY_DEPTH = {
-  'surface': ['Ubur-ubur Kotak', 'Bintang Laut Biru', 'Ikan Mas', 'Hiu Paus'],
-  'shallow': ['Ikan Badut (Nemo)', 'Ikan Kepe-kepe', 'Penyu Hijau', 'Gurita Cincin Biru', 'Hiu Banteng'],
-  'mid':     ['Ikan Buntal', 'Hiu Karang Sirip Hitam', 'Ikan Napoleon', 'Ikan Tuna', 'Ikan Todak', 'Ikan Sebelah (Halibut)'],
-  'deep':    ['Kuda Laut Pygmy', 'Pari Manta', 'Lobster Mutiara', 'Dugong'],
+  'surface': ['Ubur-ubur Kotak', 'Bintang Laut Biru', 'Ikan Mas', 'Lumba-lumba Botol', 'Ikan Kembung', 'Paus Biru'],
+  'shallow': ['Ikan Badut (Nemo)', 'Ikan Kepe-kepe', 'Penyu Hijau', 'Gurita Cincin Biru', 'Hiu Banteng', 'Ikan Gramma Kerajaan', 'Bulu Babi'],
+  'mid':     ['Ikan Buntal', 'Hiu Karang Sirip Hitam', 'Ikan Napoleon', 'Ikan Tuna', 'Ikan Todak', 'Kerapu Sunu (Coral Grouper)'],
+  'deep':    ['Kuda Laut Pygmy', 'Pari Manta', 'Lobster Mutiara', 'Ikan Sebelah (Halibut)', 'Ikan Sungut Ganda (Anglerfish)', 'Hiu Goblin', 'Ikan Turbot'],
 };
 
 const BIOTA_INFO = {
@@ -139,14 +155,21 @@ const BIOTA_INFO = {
   'Gurita Cincin Biru': { ilmiah: 'Hapalochlaena', spesifikasi: 'Ukuran kecil dengan cincin biru menyala saat terancam.', sejarah: 'Muncul sekitar 330 juta tahun lalu.' },
   'Ikan Todak': { ilmiah: 'Xiphias gladius', spesifikasi: 'Moncong rahang atas memanjang mirip pedang.', sejarah: 'Predator perairan lepas tersebar di samudra tropis.' },
   'Lobster Mutiara': { ilmiah: 'Panulirus ornatus', spesifikasi: 'Lobster besar bercorak mutiara di dasar karang.', sejarah: 'Komoditas perairan tropis Nusantara.' },
-  'Hiu Paus': { ilmiah: 'Rhincodon typus', spesifikasi: 'Spesies ikan terbesar pemakan plankton yang jinak.', sejarah: 'Telah mengarungi samudra sejak era Oligosen.' },
-  'Dugong': { ilmiah: 'Dugong dugon', spesifikasi: 'Mamalia laut herbivora pemakan lamun.', sejarah: 'Spesies purba pemakan vegetasi dasar laut.' },
   'Ikan Mas': { ilmiah: 'Carassius auratus', spesifikasi: 'Tubuh keemasan mencolok, sirip elegan. Mudah beradaptasi di berbagai kondisi air.', sejarah: 'Didomestikasi di Tiongkok lebih dari 1.000 tahun lalu, kini tersebar global.' },
   'Ikan Sebelah (Halibut)': { ilmiah: 'Hippoglossus hippoglossus', spesifikasi: 'Tubuh pipih lateral dengan kedua mata di sisi kanan. Dapat tumbuh hingga 2 meter.', sejarah: 'Ikan demersal penting secara komersial, hidup di dasar laut bersuhu dingin.' },
   'Hiu Banteng': { ilmiah: 'Carcharhinus leucas', spesifikasi: 'Moncong tumpul, tubuh kekar. Mampu masuk ke perairan tawar dan asin.', sejarah: 'Salah satu hiu paling adaptif, dikenal agresif dan sering mendekati pesisir.' },
+  'Ikan Sungut Ganda (Anglerfish)': { ilmiah: 'Lophiiformes', spesifikasi: 'Memiliki antena pendar (bioluminesensi) untuk memikat mangsa di laut dalam.', sejarah: 'Telah ada sejak era Eosen (~50 juta tahun lalu).' },
+  'Kerapu Sunu (Coral Grouper)': { ilmiah: 'Plectropomus leopardus', spesifikasi: 'Warna merah bintik biru indah. Ikan predator karang bernilai tinggi.', sejarah: 'Spesies terumbu karang tropis Pasifik-Hindia.' },
+  'Lumba-lumba Botol': { ilmiah: 'Tursiops truncatus', spesifikasi: 'Mamalia laut cerdas perenang cepat, sering melompat di permukaan air.', sejarah: 'Berevolusi dari leluhur cetacea ~50 juta tahun lalu.' },
+  'Ikan Kembung': { ilmiah: 'Rastrelliger kanagurta', spesifikasi: 'Ikan pelagis kecil perenang cepat dalam kawanan besar.', sejarah: 'Komoditas utama perairan pesisir Nusantara.' },
+  'Hiu Goblin': { ilmiah: 'Mitsukurina owstoni', spesifikasi: 'Hiu laut dalam langka dengan moncong panjang pipih dan rahang elastis penjangkau mangsa.', sejarah: 'Fosil hidup sejak periode Kapur (~125 juta tahun lalu).' },
+  'Ikan Gramma Kerajaan': { ilmiah: 'Gramma loreto', spesifikasi: 'Warna ungu dan kuning cerah mencolok. Hidup di celah terumbu karang.', sejarah: 'Ikan karang hias populer Karibia & Pasifik.' },
+  'Bulu Babi': { ilmiah: 'Diadema setosum', spesifikasi: 'Invertebrata berduri panjang yang menjaga keseimbangan alga di terumbu karang.', sejarah: 'Spesies purba sejak era Paleozoikum (> 450 juta tahun lalu).' },
+  'Ikan Turbot': { ilmiah: 'Scophthalmus maximus', spesifikasi: 'Ikan pipih dasar laut bersubstrat pasir/lumpur.', sejarah: 'Spesies demersal komersial penting.' },
+  'Paus Biru': { ilmiah: 'Balaenoptera musculus', spesifikasi: 'Hewan terbesar di bumi mencapai panjang 30m dan bobot 180 ton.', sejarah: 'Mamalia purba raksasa penyaring plankton.' },
 };
 
-const DigitalTwinModelViewer = ({ src }) => {
+const DigitalTwinModelViewer = ({ src, isPlaying = true }) => {
   const viewerRef = useRef(null);
   const [anim, setAnim] = useState(undefined);
 
@@ -164,12 +187,22 @@ const DigitalTwinModelViewer = ({ src }) => {
     return () => viewer.removeEventListener('load', handleLoad);
   }, []);
 
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+    if (isPlaying) {
+      if (typeof viewer.play === 'function') viewer.play();
+    } else {
+      if (typeof viewer.pause === 'function') viewer.pause();
+    }
+  }, [isPlaying]);
+
   return (
     <model-viewer
       ref={viewerRef}
       src={src}
       camera-orbit="45deg 80deg 100%"
-      autoplay
+      autoplay={isPlaying}
       animation-name={anim}
       interaction-prompt="none"
       style={{ width: '100%', height: '100%', background: 'transparent' }}
@@ -210,13 +243,32 @@ export default function DigitalTwinPage() {
   const [selectedLayer, setSelectedLayer] = useState(null);
   const [hoveredBiota, setHoveredBiota] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [simTemp, setSimTemp] = useState(0);
   const [simMode, setSimMode] = useState(false);
+  const [simTemp, setSimTemp] = useState(0);   // °C
+  const [simPh, setSimPh] = useState(0);       // pH
+  const [simSal, setSimSal] = useState(0);     // PPT
+  const [simDo, setSimDo] = useState(0);       // mg/L
+  const [simTurb, setSimTurb] = useState(0);   // NTU
+  const [simPreset, setSimPreset] = useState('normal');
+
+  const applyPreset = (key) => {
+    setSimPreset(key);
+    if (key === 'normal') {
+      setSimTemp(0); setSimPh(0); setSimSal(0); setSimDo(0); setSimTurb(0);
+    } else if (key === 'heatwave') {
+      setSimTemp(3.5); setSimPh(-0.1); setSimSal(0.5); setSimDo(-1.5); setSimTurb(0.5);
+    } else if (key === 'acidification') {
+      setSimTemp(1.5); setSimPh(-0.6); setSimSal(-1.5); setSimDo(-0.8); setSimTurb(1.0);
+    } else if (key === 'storm') {
+      setSimTemp(0.5); setSimPh(-0.3); setSimSal(-4.5); setSimDo(-1.2); setSimTurb(12.0);
+    }
+  };
+
   const [playback, setPlayback] = useState(false);
   const [time, setTime] = useState(100);
   const intervalRef = useRef(null);
 
-  useEffect(() => {
+  const fetchTelemetryData = useCallback(() => {
     Promise.all([
       api.get('/sensors'),
       api.get('/biota'),
@@ -227,6 +279,12 @@ export default function DigitalTwinPage() {
       setAlerts(a.data);
     }).finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    fetchTelemetryData();
+    const liveTimer = setInterval(fetchTelemetryData, 8000);
+    return () => clearInterval(liveTimer);
+  }, [fetchTelemetryData]);
 
   useEffect(() => {
     if (playback) {
@@ -258,8 +316,50 @@ export default function DigitalTwinPage() {
     ? (activeReading?.health_index || 80)
     : (kabupatenSensors.length > 0 ? Math.round(kabupatenSensors.reduce((s, x) => s + (x.latest_reading?.health_index || 0), 0) / kabupatenSensors.length) : 80);
 
-  const simulatedHealth = simMode ? Math.max(0, Math.min(100, currentHealth - simTemp * 8)) : currentHealth;
+  // Multi-parameter simulation logic
+  const tempPenalty = simTemp * 7 + (simTemp >= 2.5 ? 8 : 0);
+  const phPenalty = Math.abs(simPh) * 35 + (simPh <= -0.4 ? 12 : 0);
+  const salPenalty = Math.abs(simSal) * 2.5;
+  const doPenalty = Math.abs(Math.min(0, simDo)) * 8.5;
+  const turbPenalty = simTurb * 1.8;
+
+  const totalPenalty = tempPenalty + phPenalty + salPenalty + doPenalty + turbPenalty;
+  const simulatedHealth = simMode 
+    ? Math.max(10, Math.min(100, Math.round(currentHealth - totalPenalty))) 
+    : currentHealth;
   const healthColor = getHealthColor(simulatedHealth);
+
+  const simWarnings = [];
+  if (simMode) {
+    if (simTemp >= 2.0) {
+      simWarnings.push({
+        title: 'Marine Heatwave (Stres Termal)',
+        desc: `Kenaikan suhu +${simTemp.toFixed(1)}°C berisiko memicu pemutihan karang (coral bleaching) massal.`,
+        bg: '#fff1f2', border: '#fecdd3', color: '#be123c'
+      });
+    }
+    if (simPh <= -0.3) {
+      simWarnings.push({
+        title: 'Asidifikasi Laut (Penurunan pH)',
+        desc: `Penurunan pH (${simPh.toFixed(1)}) melarutkan kalsium karbonat pada struktur terumbu karang.`,
+        bg: '#faf5ff', border: '#e9d5ff', color: '#6b21a8'
+      });
+    }
+    if (simDo <= -1.0) {
+      simWarnings.push({
+        title: 'Hipoksia Laut (Defisit Oksigen)',
+        desc: `Defisit oksigen terlarut (${simDo.toFixed(1)} mg/L) menekan daya hidup ikan & invertebrata laut.`,
+        bg: '#fffbeb', border: '#fef3c7', color: '#b45309'
+      });
+    }
+    if (simTurb >= 5.0) {
+      simWarnings.push({
+        title: 'Sedimentasi & Kekeruhan Tinggi',
+        desc: `Lonjakan kekeruhan +${simTurb.toFixed(1)} NTU menghalangi sinar matahari untuk fotosintesis zooxanthellae.`,
+        bg: '#f0f9ff', border: '#bae6fd', color: '#0369a1'
+      });
+    }
+  }
 
   const currentTurbidity = selectedSensor
     ? (activeReading?.kekeruhan_ntu || 3)
@@ -338,7 +438,7 @@ export default function DigitalTwinPage() {
             onClick={() => setSimMode(!simMode)}
             style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}
           >
-            <Sliders size={14} /> Mode Simulasi (What-If)
+            <SlidersHorizontal size={14} /> Mode Simulasi (What-If)
           </button>
           
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#dcfce7', color: '#15803d', padding: '0.35rem 0.75rem', borderRadius: 999, fontSize: '0.75rem', fontWeight: 700 }}>
@@ -520,38 +620,118 @@ export default function DigitalTwinPage() {
           );
         })()}
         {simMode && (
-              <div className="card" style={{ border: '2px solid #0077b6', background: '#f0f9ff', padding: '1.25rem', borderRadius: '1rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '2rem', flexWrap: 'wrap' }}>
-                  <div style={{ flex: 1, minWidth: 260 }}>
-                    <div style={{ fontSize: '0.875rem', fontWeight: 700, marginBottom: 8, color: '#0f172a' }}>
-                      <Thermometer size={16} style={{ verticalAlign: 'middle', marginRight: 6, color: '#dc2626' }} />
-                      Simulasi Kenaikan Suhu: <span style={{ color: simTemp > 0 ? '#dc2626' : '#0f172a', fontWeight: 800 }}>+{simTemp.toFixed(1)}°C</span>
-                    </div>
-                    <input 
-                      type="range" min="0" max="5" step="0.5" value={simTemp}
-                      onChange={e => setSimTemp(parseFloat(e.target.value))}
-                      style={{ width: '100%', accentColor: '#dc2626', cursor: 'pointer' }} 
-                    />
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#64748b', marginTop: 4 }}>
-                      <span>Normal (0°C)</span><span>+2.5°C</span><span>+5.0°C (Kritis)</span>
-                    </div>
-                  </div>
-                  
-                  <div style={{ textAlign: 'center', background: '#ffffff', padding: '0.75rem 1.5rem', borderRadius: '0.75rem', border: '1px solid #cbd5e1' }}>
-                    <div style={{ fontSize: '0.6875rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Prediksi Health Index</div>
-                    <div style={{ fontSize: '2rem', fontWeight: 800, color: healthColor, lineHeight: 1.1 }}>{simulatedHealth}</div>
-                    <div style={{ fontSize: '0.75rem', color: healthColor, fontWeight: 700 }}>{getHealthLabel(simulatedHealth)}</div>
-                  </div>
-
-                  {simTemp >= 2 && (
-                    <div style={{ background: '#fee2e2', border: '1px solid #fca5a5', padding: '0.75rem 1rem', borderRadius: '0.75rem', fontSize: '0.8125rem', color: '#b91c1c', maxWidth: 280 }}>
-                      <AlertTriangle size={16} style={{ verticalAlign: 'middle', marginRight: 6 }} />
-                      <strong>Peringatan Dini!</strong> Kenaikan suhu +{simTemp}°C dapat memicu pemutihan karang (*coral bleaching*) massal.
-                    </div>
-                  )}
+          <div className="card" style={{ 
+            border: '1px solid rgba(255, 255, 255, 0.25)', 
+            background: 'linear-gradient(135deg, #023e8a 0%, #0077b6 55%, #0369a1 100%)', 
+            padding: '0.875rem 1.25rem', 
+            borderRadius: '1rem', 
+            boxShadow: '0 8px 24px rgba(2, 62, 138, 0.25)',
+            color: '#ffffff',
+            position: 'relative',
+            overflow: 'hidden'
+          }}>
+            {/* Header & Scenario Presets */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.2)', paddingBottom: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ background: 'rgba(255, 255, 255, 0.2)', border: '1px solid rgba(255, 255, 255, 0.3)', color: '#ffffff', padding: '5px', borderRadius: '0.5rem', display: 'flex' }}>
+                  <SlidersHorizontal size={16} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '0.9375rem', fontWeight: 800, color: '#ffffff' }}>Simulasi What-If Multi-Parameter</h3>
+                  <span style={{ fontSize: '0.6875rem', color: 'rgba(255, 255, 255, 0.85)', fontWeight: 500 }}>Pratinjau interaktif skenario ekosistem laut (simulasi terisolasi)</span>
                 </div>
               </div>
+
+              {/* Scenario Presets buttons */}
+              <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                {[
+                  { key: 'normal', label: 'Normal', icon: CheckCircle2, color: '#15803d' },
+                  { key: 'heatwave', label: 'Heatwave', icon: Flame, color: '#dc2626' },
+                  { key: 'acidification', label: 'Asidifikasi', icon: FlaskConical, color: '#7c3aed' },
+                  { key: 'storm', label: 'Badai & Limpasan', icon: CloudRain, color: '#0284c7' },
+                ].map(p => {
+                  const isActive = simPreset === p.key;
+                  const IconComponent = p.icon;
+                  return (
+                    <button key={p.key} onClick={() => applyPreset(p.key)} style={{
+                      padding: '0.25rem 0.65rem', borderRadius: '2rem',
+                      border: isActive ? '1.5px solid #ffffff' : '1px solid rgba(255,255,255,0.3)',
+                      background: isActive ? '#ffffff' : 'rgba(255, 255, 255, 0.15)',
+                      color: isActive ? p.color : '#ffffff',
+                      fontSize: '0.71875rem', fontWeight: 700,
+                      cursor: 'pointer', transition: 'all 0.15s',
+                      display: 'flex', alignItems: 'center', gap: 4
+                    }}>
+                      <IconComponent size={12} />
+                      {p.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 5 Parameter Sliders (5-column full width grid without outline) */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.65rem' }}>
+              
+              {/* 1. Suhu */}
+              <div style={{ background: '#ffffff', padding: '0.55rem 0.75rem', borderRadius: '0.625rem', boxShadow: '0 2px 6px rgba(0,0,0,0.06)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', fontWeight: 700, color: '#0f172a', marginBottom: 4, alignItems: 'center' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><Thermometer size={12} color="#dc2626" /> Suhu</span>
+                  <span style={{ color: simTemp > 0 ? '#dc2626' : '#16a34a', fontWeight: 800 }}>{simTemp > 0 ? `+${simTemp.toFixed(1)}°C` : '0°C'}</span>
+                </div>
+                <input type="range" min="0" max="5" step="0.5" value={simTemp} onChange={e => { setSimTemp(parseFloat(e.target.value)); setSimPreset('custom'); }} className="custom-range-slider" style={{ '--accent-color': '#dc2626' }} />
+              </div>
+
+              {/* 2. pH */}
+              <div style={{ background: '#ffffff', padding: '0.55rem 0.75rem', borderRadius: '0.625rem', boxShadow: '0 2px 6px rgba(0,0,0,0.06)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', fontWeight: 700, color: '#0f172a', marginBottom: 4, alignItems: 'center' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><FlaskConical size={12} color="#7c3aed" /> pH Air</span>
+                  <span style={{ color: simPh < 0 ? '#7c3aed' : '#16a34a', fontWeight: 800 }}>{simPh !== 0 ? `${simPh > 0 ? '+' : ''}${simPh.toFixed(1)}` : '0'}</span>
+                </div>
+                <input type="range" min="-1.5" max="0.5" step="0.1" value={simPh} onChange={e => { setSimPh(parseFloat(e.target.value)); setSimPreset('custom'); }} className="custom-range-slider" style={{ '--accent-color': '#7c3aed' }} />
+              </div>
+
+              {/* 3. Salinitas */}
+              <div style={{ background: '#ffffff', padding: '0.55rem 0.75rem', borderRadius: '0.625rem', boxShadow: '0 2px 6px rgba(0,0,0,0.06)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', fontWeight: 700, color: '#0f172a', marginBottom: 4, alignItems: 'center' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><Waves size={12} color="#0284c7" /> Salinitas</span>
+                  <span style={{ color: simSal !== 0 ? '#0284c7' : '#16a34a', fontWeight: 800 }}>{simSal !== 0 ? `${simSal > 0 ? '+' : ''}${simSal.toFixed(1)}` : '0'}</span>
+                </div>
+                <input type="range" min="-6" max="6" step="0.5" value={simSal} onChange={e => { setSimSal(parseFloat(e.target.value)); setSimPreset('custom'); }} className="custom-range-slider" style={{ '--accent-color': '#0284c7' }} />
+              </div>
+
+              {/* 4. DO */}
+              <div style={{ background: '#ffffff', padding: '0.55rem 0.75rem', borderRadius: '0.625rem', boxShadow: '0 2px 6px rgba(0,0,0,0.06)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', fontWeight: 700, color: '#0f172a', marginBottom: 4, alignItems: 'center' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><Droplets size={12} color="#d97706" /> Oksigen</span>
+                  <span style={{ color: simDo < 0 ? '#d97706' : '#16a34a', fontWeight: 800 }}>{simDo !== 0 ? `${simDo > 0 ? '+' : ''}${simDo.toFixed(1)}` : '0'}</span>
+                </div>
+                <input type="range" min="-4" max="2" step="0.2" value={simDo} onChange={e => { setSimDo(parseFloat(e.target.value)); setSimPreset('custom'); }} className="custom-range-slider" style={{ '--accent-color': '#d97706' }} />
+              </div>
+
+              {/* 5. Kekeruhan */}
+              <div style={{ background: '#ffffff', padding: '0.55rem 0.75rem', borderRadius: '0.625rem', boxShadow: '0 2px 6px rgba(0,0,0,0.06)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', fontWeight: 700, color: '#0f172a', marginBottom: 4, alignItems: 'center' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><Eye size={12} color="#b45309" /> Kekeruhan</span>
+                  <span style={{ color: simTurb > 0 ? '#b45309' : '#16a34a', fontWeight: 800 }}>{simTurb > 0 ? `+${simTurb.toFixed(1)}` : '0'}</span>
+                </div>
+                <input type="range" min="0" max="15" step="0.5" value={simTurb} onChange={e => { setSimTurb(parseFloat(e.target.value)); setSimPreset('custom'); }} className="custom-range-slider" style={{ '--accent-color': '#b45309' }} />
+              </div>
+            </div>
+
+            {/* Dynamic Warnings List */}
+            {simWarnings.length > 0 && (
+              <div style={{ marginTop: '0.65rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                {simWarnings.map((w, i) => (
+                  <div key={i} style={{ background: w.bg, border: `1px solid ${w.border}`, color: w.color, padding: '0.35rem 0.75rem', borderRadius: '0.5rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <AlertTriangle size={13} style={{ flexShrink: 0 }} />
+                    <span><strong>{w.title}:</strong> {w.desc}</span>
+                  </div>
+                ))}
+              </div>
             )}
+          </div>
+        )}
 
             {/* MAIN VISUALIZATION & DATA COLUMNS */}
             {(() => {
@@ -575,14 +755,18 @@ export default function DigitalTwinPage() {
                   </h3>
                   
                   {/* Playback Controls */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <button className="btn btn-ghost btn-sm" onClick={() => { setTime(0); setPlayback(false); }} title="Reset"><SkipBack size={14} /></button>
-                    <button className="btn btn-ghost btn-sm" onClick={() => setPlayback(!playback)}>
-                      {playback ? <Pause size={14} /> : <Play size={14} />}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <button className="btn btn-ghost btn-sm" onClick={() => { setTime(0); setPlayback(false); }} title="Reset Animasi" style={{ padding: '0.3rem 0.6rem' }}>
+                      <SkipBack size={14} />
                     </button>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>
-                      {playback ? 'Memutar Simulasi...' : 'Live Stream'}
-                    </span>
+                    <button 
+                      className={`btn btn-sm ${playback ? 'btn-primary' : 'btn-secondary'}`} 
+                      onClick={() => setPlayback(!playback)}
+                      style={{ fontWeight: 600, fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 5, padding: '0.3rem 0.75rem' }}
+                    >
+                      {playback ? <Pause size={13} /> : <Play size={13} />}
+                      {playback ? 'Pause Animasi' : 'Play Animasi Arus'}
+                    </button>
                   </div>
                 </div>
 
@@ -631,6 +815,7 @@ export default function DigitalTwinPage() {
                         transformOrigin: 'top center',
                         borderRadius: 4,
                         animation: `lightRay ${2.5 + i * 0.4}s ease-in-out ${i * 0.3}s infinite alternate`,
+                        animationPlayState: playback ? 'running' : 'paused',
                       }} />
                     ))}
                   </div>
@@ -675,31 +860,41 @@ export default function DigitalTwinPage() {
                           )}
                         </div>
 
-                        {/* Sensor dots — left area */}
-                        <div style={{ position: 'absolute', left: 14, right: '52%', top: 34, bottom: 6, display: 'flex', gap: 8, flexWrap: 'wrap', alignContent: 'flex-start', overflowY: 'auto', scrollbarWidth: 'none' }}>
+                        {/* Sensor dots — left area (clean scroll & auto-compact sizing) */}
+                        <div style={{
+                          position: 'absolute', left: 14, right: '48%', top: 34, bottom: 4,
+                          display: 'flex', gap: 6, flexWrap: 'wrap', alignContent: 'flex-start',
+                          overflowY: 'auto', scrollbarWidth: 'thin', paddingRight: 4, zIndex: 7
+                        }}>
                           {layerSensors.map((s) => {
                             const hi = s.latest_reading?.health_index || 75;
                             const c = getHealthColor(simMode ? Math.max(0, hi - simTemp * 8) : hi);
+                            const isMany = layerSensors.length > 5;
+                            const dotSize = isMany ? 26 : 30;
                             return (
                               <div key={s.sensor_id}
                                 title={`${s.nama_lokasi}\n${s.sensor_id}\nHI: ${simMode ? Math.max(0, Math.round(hi - simTemp * 8)) : Math.round(hi)}`}
-                                style={{ width: 34, height: 34, borderRadius: '50%', background: c, border: '2px solid rgba(255,255,255,0.9)', boxShadow: `0 0 12px ${c}90`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#fff', cursor: 'help', flexShrink: 0 }}>
-                                <span style={{ fontSize: '0.4rem', fontWeight: 800, lineHeight: 1 }}>HI</span>
-                                <span style={{ fontSize: '0.65rem', fontWeight: 800 }}>{simMode ? Math.max(0, Math.round(hi - simTemp * 8)) : Math.round(hi)}</span>
+                                style={{
+                                  width: dotSize, height: dotSize, borderRadius: '50%',
+                                  background: c, border: '2px solid rgba(255,255,255,0.95)',
+                                  boxShadow: `0 0 10px ${c}90`, display: 'flex', flexDirection: 'column',
+                                  alignItems: 'center', justifyContent: 'center', color: '#fff',
+                                  cursor: 'help', flexShrink: 0, transition: 'transform 0.15s ease'
+                                }}>
+                                <span style={{ fontSize: isMany ? '0.35rem' : '0.4rem', fontWeight: 800, lineHeight: 1 }}>HI</span>
+                                <span style={{ fontSize: isMany ? '0.55rem' : '0.625rem', fontWeight: 800 }}>{simMode ? Math.max(0, Math.round(hi - simTemp * 8)) : Math.round(hi)}</span>
                               </div>
                             );
                           })}
                         </div>
 
-                        {/* === BIOTA 3D MODELS — right area === */}
+                        {/* === BIOTA 3D MODELS — right area (perfectly bounded without clipping) === */}
                         {layerBiota.map((biotaName, bi) => {
                           const modelSrc = MODEL_MAP[biotaName];
-                          // Spread evenly across right 50-96% of layer
                           const totalBiota = layerBiota.length;
-                          const xPct = 50 + ((bi + 0.5) / totalBiota) * 46;
-                          // Alternate vertical positions for natural look
-                          const yPos = bi % 3 === 0 ? 4 : bi % 3 === 1 ? 22 : 38;
-                          const size = modelSrc ? 72 : 40;
+                          const xPct = 52 + ((bi + 0.5) / Math.max(1, totalBiota)) * 38;
+                          const yPos = 30 + (bi % 2) * 14;
+                          const size = modelSrc ? 52 : 36;
                           const floatDur = 2.5 + (bi % 4) * 0.7;
                           const floatDelay = bi * 0.5;
                           return (
@@ -709,10 +904,12 @@ export default function DigitalTwinPage() {
                               top: yPos,
                               width: size,
                               height: size,
-                              zIndex: 6,
+                              zIndex: 8,
                               cursor: 'pointer',
                               animation: `float ${floatDur}s ease-in-out ${floatDelay}s infinite alternate`,
-                              filter: idx >= 2 ? `brightness(${0.85 - idx * 0.08})` : 'none',
+                              animationPlayState: playback ? 'running' : 'paused',
+                              filter: idx >= 2 ? `brightness(${0.9 - idx * 0.08})` : 'none',
+                              transition: 'transform 0.2s ease',
                             }}
                             onMouseMove={(e) => {
                               e.stopPropagation();
@@ -720,10 +917,10 @@ export default function DigitalTwinPage() {
                             }}
                             onMouseLeave={() => setHoveredBiota(null)}>
                               {modelSrc ? (
-                                <DigitalTwinModelViewer src={modelSrc} />
+                                <DigitalTwinModelViewer src={modelSrc} isPlaying={playback} />
                               ) : (
                                 <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                  <Fish size={22} color="rgba(255,255,255,0.85)" />
+                                  <Fish size={20} color="rgba(255,255,255,0.85)" />
                                 </div>
                               )}
                             </div>
@@ -757,6 +954,7 @@ export default function DigitalTwinPage() {
                       border: '1px solid rgba(255,255,255,0.5)',
                       zIndex: 8, pointerEvents: 'none',
                       animation: `bubbleRise ${3 + i * 0.6}s ease-in ${i * 0.7}s infinite`,
+                      animationPlayState: playback ? 'running' : 'paused',
                     }} />
                   ))}
 
