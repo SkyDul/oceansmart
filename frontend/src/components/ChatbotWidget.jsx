@@ -41,8 +41,12 @@ export default function ChatbotWidget() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // Only scroll when chat is open AND a non-alert message is added
   useEffect(() => {
-    if (isOpen) {
+    if (!isOpen) return;
+    // Don't scroll for alert_notif — let user read bot replies without interruption
+    const lastMsg = messages[messages.length - 1];
+    if (lastMsg && lastMsg.type !== 'alert_notif') {
       scrollToBottom();
     }
   }, [messages, isOpen]);
@@ -102,7 +106,7 @@ export default function ChatbotWidget() {
   useEffect(() => {
     if (!alerts) return;
 
-    const activeAlerts = alerts.filter(a => !a.is_resolved);
+    const activeAlerts = alerts.filter(a => !a.is_resolved && a.level !== 'normal');
     setHasAlerts(activeAlerts.length > 0);
 
     if (activeAlerts.length > 0) {
@@ -147,7 +151,7 @@ export default function ChatbotWidget() {
 
     try {
       const res = await chatbotApi.post('/chatbot', { message: userMsg });
-      const reply = (res.data.reply || '').replace(/\*\*/g, '');
+      const reply = (res.data.reply || '').replace(/\*/g, '');
       setMessages(prev => [...prev, { role: 'bot', text: reply }]);
       setBotAnimation(hasAlerts ? (pickAnim('fall', availableAnims) || 'Fall') : (pickAnim('wave', availableAnims) || 'Wave'));
     } catch {

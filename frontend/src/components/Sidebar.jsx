@@ -1,7 +1,7 @@
 import { NavLink, Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Map, Activity, Fish,
-  AlertTriangle, Globe, Settings, LogOut, Anchor
+  AlertTriangle, Globe, Settings, LogOut, Anchor, Sliders
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAlert } from './AlertNotifier';
@@ -13,6 +13,7 @@ const navItemsAll = [
   { path: '/monitoring', label: 'Monitoring', icon: Activity },
   { path: '/biota', label: 'Biota Laut', icon: Fish },
   { path: '/alerts', label: 'Peringatan', icon: AlertTriangle, hasBadge: true },
+  { path: '/simulator', label: 'Lab Simulasi', icon: Sliders, penggunaOnly: true },
 ];
 
 const operatorItems = [
@@ -23,14 +24,14 @@ export default function Sidebar() {
   const location = useLocation();
   const { alerts } = useAlert();
 
-  // Badge count — unresolved alerts only, real-time from context
-  const alertCount = (alerts || []).filter(a => !a.is_resolved).length;
-
   const savedUser = JSON.parse(localStorage.getItem('ocean_user') || '{}');
   const userRole = localStorage.getItem('ocean_role') || 'pengguna';
   const userName = savedUser?.name || savedUser?.given_name || 'Pengguna';
   const userPhoto = savedUser?.picture || null;
   const [imgError, setImgError] = useState(false);
+
+  // Badge: only bahaya/waspada, not normal — backend already filters by wilayah for operator
+  const alertCount = (alerts || []).filter(a => !a.is_resolved && a.level !== 'normal').length;
 
   const handleLogout = () => {
     localStorage.removeItem('ocean_user');
@@ -43,9 +44,7 @@ export default function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
-        <div className="sidebar-brand-icon">
-          <Anchor size={22} />
-        </div>
+        <div className="sidebar-brand-icon"><Anchor size={22} /></div>
         <div className="sidebar-text-group">
           <h1>OceanSmart</h1>
           <span>Marine Intelligence</span>
@@ -54,7 +53,9 @@ export default function Sidebar() {
 
       <nav className="sidebar-nav">
         <div className="sidebar-section-label">Menu Utama</div>
-        {navItemsAll.map(item => (
+        {navItemsAll
+          .filter(item => !item.penggunaOnly || userRole === 'pengguna')
+          .map(item => (
             <NavLink
               key={item.path}
               to={item.path}
@@ -93,41 +94,33 @@ export default function Sidebar() {
       <div style={{ padding: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.08)', marginTop: 'auto', overflow: 'hidden' }}>
         {userRole === 'admin' ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', padding: '0.5rem', borderRadius: '0.5rem' }}>
-            {userPhoto && !imgError ? (
-              <img src={userPhoto} alt="avatar" onError={() => setImgError(true)} style={{ width: 36, height: 36, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.2)', flexShrink: 0, objectFit: 'cover' }} />
-            ) : (
-              <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <span style={{ color: '#fff', fontSize: '0.85rem', fontWeight: 800 }}>{userName.charAt(0).toUpperCase()}</span>
-              </div>
-            )}
+            {userPhoto && !imgError
+              ? <img src={userPhoto} alt="avatar" onError={() => setImgError(true)} style={{ width: 36, height: 36, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.2)', flexShrink: 0, objectFit: 'cover' }} />
+              : <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <span style={{ color: '#fff', fontSize: '0.85rem', fontWeight: 800 }}>{userName.charAt(0).toUpperCase()}</span>
+                </div>}
             <div className="sidebar-text" style={{ flex: 1 }}>
               <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{userName}</div>
               <div style={{ fontSize: '0.6875rem', color: '#48cae4', textTransform: 'capitalize', fontWeight: 600 }}>Role: {userRole}</div>
             </div>
           </div>
         ) : (
-          <Link to="/profile"
-            style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', textDecoration: 'none', cursor: 'pointer', padding: '0.5rem', borderRadius: '0.5rem', transition: 'background 0.2s' }}
+          <Link to="/profile" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', textDecoration: 'none', cursor: 'pointer', padding: '0.5rem', borderRadius: '0.5rem', transition: 'background 0.2s' }}
             onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
           >
-            {userPhoto && !imgError ? (
-              <img src={userPhoto} alt="avatar" onError={() => setImgError(true)} style={{ width: 36, height: 36, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.2)', flexShrink: 0, objectFit: 'cover' }} />
-            ) : (
-              <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <span style={{ color: '#fff', fontSize: '0.85rem', fontWeight: 800 }}>{userName.charAt(0).toUpperCase()}</span>
-              </div>
-            )}
+            {userPhoto && !imgError
+              ? <img src={userPhoto} alt="avatar" onError={() => setImgError(true)} style={{ width: 36, height: 36, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.2)', flexShrink: 0, objectFit: 'cover' }} />
+              : <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <span style={{ color: '#fff', fontSize: '0.85rem', fontWeight: 800 }}>{userName.charAt(0).toUpperCase()}</span>
+                </div>}
             <div className="sidebar-text" style={{ flex: 1 }}>
               <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{userName}</div>
-              <div style={{ fontSize: '0.6875rem', color: userRole === 'operator' ? '#48cae4' : 'rgba(255,255,255,0.5)', textTransform: 'capitalize', fontWeight: 600 }}>
-                Role: {userRole}
-              </div>
+              <div style={{ fontSize: '0.6875rem', color: userRole === 'operator' ? '#48cae4' : 'rgba(255,255,255,0.5)', textTransform: 'capitalize', fontWeight: 600 }}>Role: {userRole}</div>
             </div>
           </Link>
         )}
-        <button
-          onClick={handleLogout}
+        <button onClick={handleLogout}
           style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '0.6rem 0.75rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '0.5rem', color: 'rgba(255,255,255,0.7)', fontSize: '0.8125rem', cursor: 'pointer', transition: 'all 0.25s' }}
           onMouseEnter={e => { e.currentTarget.style.background = 'rgba(220,38,38,0.2)'; e.currentTarget.style.color = '#fca5a5'; e.currentTarget.style.borderColor = 'rgba(220,38,38,0.3)'; }}
           onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = 'rgba(255,255,255,0.7)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; }}

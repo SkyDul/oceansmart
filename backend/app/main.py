@@ -128,7 +128,7 @@ def startup():
             # Sinkronisasi parameter laut real-time
             update_realtime_ocean_cache()
             
-            now = datetime.utcnow()
+            now = datetime.now()
             db_sensors = db.query(Sensor).all()
             
             # Count online sensors to enforce anomaly minimum
@@ -276,7 +276,7 @@ def startup():
                                 "threshold_max": alert_obj.threshold_max,
                                 "level": alert_obj.level,
                                 "message": alert_obj.message,
-                                "created_at": alert_obj.created_at.isoformat() if alert_obj.created_at else now.isoformat(),
+                                "created_at": now.isoformat(),
                                 "is_resolved": False
                             }
                             push_alert_to_clients(alert_dict)
@@ -293,14 +293,13 @@ def startup():
                                     "threshold_max": alert_obj.threshold_max,
                                     "level": alert_obj.level,
                                     "message": alert_obj.message,
-                                    "created_at": alert_obj.created_at.isoformat() if alert_obj.created_at else now.isoformat(),
+                                    "created_at": now.isoformat(),
                                     "is_resolved": False,
                                     "event_type": "update"
                                 }
                                 push_alert_to_clients(update_dict)
                 
-                # Jika parameter kembali normal: auto-selesaikan alert yang ada.
-                # Update in-place (bukan buat riwayat baru) → tampil sebagai Terselesaikan (✅).
+                # Jika parameter kembali normal: hapus alert agar tidak menumpuk (nyampah).
                 # Hapus dari active_danger_states → notifikasi baru muncul jika bahaya kembali.
                 for a in existing_unresolved:
                     if a.parameter not in active_params_in_reading:
@@ -314,14 +313,8 @@ def startup():
                         }
                         r_key = param_key_map.get(a.parameter, "ph")
                         normal_val = reading.get(r_key, a.value)
-                        # Update alert in-place → Terselesaikan
-                        a.is_resolved = True
-                        a.resolved_at = now
-                        a.level = "normal"
-                        a.value = normal_val
-                        a.message = f"{a.parameter} kembali ke kondisi Normal ({normal_val})"
-                        db.flush()
-                        # Kirim SSE resolved agar kartu langsung berubah hijau di frontend
+                        
+                        # Kirim SSE resolved agar kartu langsung dihapus di frontend
                         if active_danger_states.pop(danger_key, False):
                             resolved_dict = {
                                 "id": a.id,
@@ -331,12 +324,16 @@ def startup():
                                 "threshold_min": a.threshold_min,
                                 "threshold_max": a.threshold_max,
                                 "level": "normal",
-                                "message": a.message,
-                                "created_at": a.created_at.isoformat() if a.created_at else now.isoformat(),
+                                "message": f"{a.parameter} kembali ke kondisi Normal ({normal_val})",
+                                "created_at": now.isoformat(),
                                 "is_resolved": True,
                                 "event_type": "resolved"
                             }
                             push_resolved_to_clients(resolved_dict)
+                        
+                        # Hapus alert dari database
+                        db.delete(a)
+                        db.flush()
                     else:
                         db.flush()
                     
@@ -699,12 +696,11 @@ def create_sensor(body: dict, db: Session = Depends(get_db)):
 
             alert_data = check_thresholds_and_create_alert(reading)
             if alert_data:
-                alert_data["created_at"] = reading_time
-                alert_data["is_resolved"] = day_offset > 0
-                if day_offset > 0:
-                    import random
-                    alert_data["resolved_at"] = reading_time + timedelta(hours=random.randint(1, 4))
-                alerts_batch.append(Alert(**alert_data))
+                # Hanya simpan alert aktif (day_offset == 0) agar tidak menumpuk riwayat resolved
+                if day_offset == 0:
+                    alert_data["created_at"] = reading_time
+                    alert_data["is_resolved"] = False
+                    alerts_batch.append(Alert(**alert_data))
 
     db.bulk_save_objects(readings_batch)
     db.bulk_save_objects(alerts_batch)
@@ -798,12 +794,30 @@ def resolve_alert(alert_id: int, db: Session = Depends(get_db)):
     alert = db.query(Alert).filter(Alert.id == alert_id).first()
     if not alert:
         raise HTTPException(status_code=404, detail="Alert tidak ditemukan")
-    alert.is_resolved = True
-    alert.resolved_at = datetime.utcnow()
-    db.commit()
+    
     # Hapus dari tracking state agar notifikasi baru bisa muncul jika bahaya kembali
     danger_key = f"{alert.sensor_id}_{alert.parameter}"
     active_danger_states.pop(danger_key, None)
+    
+    # Kirim event resolved ke SSE client
+    resolved_dict = {
+        "id": alert.id,
+        "sensor_id": alert.sensor_id,
+        "parameter": alert.parameter,
+        "value": alert.value,
+        "threshold_min": alert.threshold_min,
+        "threshold_max": alert.threshold_max,
+        "level": "normal",
+        "message": f"{alert.parameter} ditandai selesai oleh operator",
+        "created_at": alert.created_at.isoformat() if alert.created_at else datetime.utcnow().isoformat(),
+        "is_resolved": True,
+        "event_type": "resolved"
+    }
+    push_resolved_to_clients(resolved_dict)
+    
+    # Hapus dari database
+    db.delete(alert)
+    db.commit()
     return {"message": "Peringatan berhasil diselesaikan", "id": alert_id}
 
 
@@ -1050,8 +1064,11 @@ Panduan menjawab:
 
 
 def clean_reply(text: str) -> str:
-    """Remove markdown bold markers from reply."""
-    return text.replace("**", "")
+    """Remove ALL markdown markers from reply: bold **, italic *, headers #."""
+    import re
+    text = text.replace("*", "")  # completely remove all asterisks!
+    text = re.sub(r'^#{1,3}\s', '', text, flags=re.MULTILINE)  # headers
+    return text
 
 
 ABBREVIATIONS = {
@@ -1285,6 +1302,9 @@ async def chatbot_message(
             pass
 
     # --- Offline fallback — still uses real data ---
+    # Helper: strip all markdown from offline replies
+    def off(reply: str, ctx: bool = True):
+        return {"reply": clean_reply(reply), "context_used": ctx}
     import re
     msg_lower = message.lower()
 
@@ -1744,60 +1764,6 @@ def login_google(body: dict, db: Session = Depends(get_db)):
 
 
 
-# -------------------- ALERTS STREAM & ACTIONS --------------------
-
-@app.get("/api/alerts/stream")
-async def alert_stream():
-    """SSE Endpoint for realtime alert streaming."""
-    async def event_generator() -> AsyncGenerator[str, None]:
-        q = asyncio.Queue()
-        sse_clients.add(q)
-        try:
-            while True:
-                alert = await q.get()
-                yield f"data: {json.dumps(alert)}\n\n"
-        except asyncio.CancelledError:
-            pass
-        finally:
-            sse_clients.remove(q)
-            
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
-
-@app.patch("/api/alerts/{alert_id}/resolve")
-def resolve_alert(
-    alert_id: int,
-    db: Session = Depends(get_db),
-    x_user_role: Optional[str] = Header(None)
-):
-    """Mark an alert as resolved."""
-    alert = db.query(Alert).filter(Alert.id == alert_id).first()
-    if not alert:
-        raise HTTPException(status_code=404, detail="Alert not found")
-        
-    alert.is_resolved = True
-    db.commit()
-    
-    # Reset notified state so future breaches trigger a new notification
-    danger_key = f"{alert.sensor_id}_{alert.parameter}"
-    active_danger_states.pop(danger_key, None)
-    
-    # Notify clients that this alert is resolved
-    alert_dict = {
-        "id": alert.id,
-        "sensor_id": alert.sensor_id,
-        "parameter": alert.parameter,
-        "value": alert.value,
-        "threshold_min": alert.threshold_min,
-        "threshold_max": alert.threshold_max,
-        "level": alert.level,
-        "message": alert.message,
-        "created_at": alert.created_at.isoformat(),
-        "is_resolved": True,
-        "event_type": "resolved"
-    }
-    push_alert_to_clients(alert_dict)
-    
-    return {"status": "success", "message": "Alert resolved"}
 
 
 # -------------------- ROOT --------------------

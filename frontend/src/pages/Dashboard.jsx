@@ -192,7 +192,7 @@ export default function Dashboard() {
     ? alerts 
     : alerts.filter(a => activeSensors.some(s => s.sensor_id === a.sensor_id));
     
-  const activeAlertsCount = displayAlerts.filter(a => !a.is_resolved).length || displayAlerts.length;
+  const activeAlertsCount = displayAlerts.filter(a => !a.is_resolved).length;
 
   const health = getHealthLabel(avgHealthIndex);
 
@@ -496,20 +496,15 @@ export default function Dashboard() {
                     </div>
                   );
                 }
-                const sorted = [...list].sort((a, b) => {
-                  if (!a.is_resolved && b.is_resolved) return -1;
-                  if (a.is_resolved && !b.is_resolved) return 1;
-                  return new Date(b.created_at) - new Date(a.created_at);
-                });
+                const sorted = [...list].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
                 return sorted.slice(0, 6).map(a => {
                   const sensorObj = sensors.find(s => s.sensor_id === a.sensor_id);
                   const sLoc = sensorObj ? sensorObj.nama_lokasi : a.sensor_id;
                   const isDanger = a.level === 'bahaya';
-                  const isResolved = a.is_resolved;
-                  const dotColor = isResolved ? '#94a3b8' : (isDanger ? '#dc2626' : '#d97706');
-                  const borderCol = isResolved ? '#cbd5e1' : (isDanger ? '#fecdd3' : '#fef3c7');
-                  const bgCol = isResolved ? '#f8fafc' : (isDanger ? '#fff1f2' : '#fffbeb');
-                  const badgeCol = isResolved ? '#94a3b8' : (isDanger ? '#dc2626' : '#d97706');
+                  const dotColor = isDanger ? '#dc2626' : '#d97706';
+                  const borderCol = isDanger ? '#fecdd3' : '#fef3c7';
+                  const bgCol = isDanger ? '#fff1f2' : '#fffbeb';
+                  const badgeCol = isDanger ? '#dc2626' : '#d97706';
                   
                   return (
                     <div key={a.id} className="alert-item" style={{
@@ -520,8 +515,7 @@ export default function Dashboard() {
                       background: bgCol,
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '0.75rem',
-                      opacity: isResolved ? 0.75 : 1
+                      gap: '0.75rem'
                     }}>
                       <div className={`alert-dot ${a.level}`} style={{ width: 8, height: 8, borderRadius: '50%', background: dotColor, flexShrink: 0 }} />
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -531,7 +525,7 @@ export default function Dashboard() {
                             padding: '2px 8px', borderRadius: 12, fontSize: '0.65rem', fontWeight: 800,
                             textTransform: 'uppercase',
                             background: badgeCol, color: '#fff'
-                          }}>{isResolved ? 'Selesai' : a.level}</span>
+                          }}>{a.level}</span>
                         </div>
                         <div style={{ fontSize: '0.75rem', color: '#334155', marginTop: 2 }}>{a.message}</div>
                         <div style={{ fontSize: '0.6875rem', color: '#64748b', marginTop: 3 }}>

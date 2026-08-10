@@ -62,67 +62,31 @@ const MODEL_MAP = {
 
 
 function getSensorsForProvinceAndKabupaten(provinceId, kabupatenId, realSensors) {
-  if (provinceId === 'jabar') {
-    return kabupatenId === 'all' 
-      ? realSensors 
-      : realSensors.filter(s => (s.wilayah || '').toLowerCase() === kabupatenId.toLowerCase() || s.nama_lokasi.toLowerCase().includes(kabupatenId.toLowerCase()));
-  }
-
-  const kabList = KABUPATEN_BY_PROVINCE[provinceId] || [];
-  const activeKabs = kabupatenId === 'all' ? kabList.filter(k => k.id !== 'all') : kabList.filter(k => k.id === kabupatenId);
-  
-  const KAB_ABBREVIATIONS = {
-    'Pangandaran': 'PGD',
-    'Sukabumi': 'SKB',
-    'Indramayu': 'IDR',
-    'Cirebon': 'CRB',
-    'Karawang': 'KRW',
-    'Subang': 'SBG',
-    'Parangtritis': 'PRG',
-    'Karimunjawa': 'KJW',
-    'Nusa Penida': 'NPD',
-    'Buleleng': 'BLL',
-    'Banyuwangi': 'BWI',
-    'Wakatobi': 'WKT',
-    'Bunaken': 'BNK',
-    'Manggarai Barat': 'KMD',
-    'Raja Ampat': 'RAA',
-    'Maluku Tengah': 'MLK',
-    'Denpasar': 'DPS',
-    'Malang': 'MLG'
+  // Single source of truth — semua dari DB/API, tidak ada dummy hardcoded
+  const provMap = {
+    'jabar': 'jawa barat', 'banten': 'banten', 'dki': 'jakarta',
+    'jateng': 'jawa tengah', 'jatim': 'jawa timur', 'diy': 'yogyakarta',
+    'bali': 'bali', 'ntt': 'nusa tenggara timur', 'sultra': 'sulawesi tenggara',
+    'sulut': 'sulawesi utara', 'maluku': 'maluku', 'papua': 'papua',
   };
 
-  let dummySensors = [];
-  let index = 1;
-  
-  activeKabs.forEach(kab => {
-    const abbrev = KAB_ABBREVIATIONS[kab.name.replace('Kab. ', '').split(' ')[0]] || KAB_ABBREVIATIONS[kab.id] || kab.id.substring(0, 3).toUpperCase();
-    for (let i = 1; i <= 2; i++) {
-      const sensorId = `OS-DUMMY-${abbrev}-${i.toString().padStart(3, '0')}`;
-      dummySensors.push({
-        sensor_id: sensorId,
-        nama_lokasi: `Sensor Telemetri ${kab.name} #${i}`,
-        lat: provinceId === 'bali' ? -8.4 + (index * 0.05) : -6.5 - (index * 0.05),
-        lng: provinceId === 'bali' ? 115.1 + (index * 0.05) : 106.8 + (index * 0.05),
-        kedalaman_m: 2 + (index * 3) % 15,
-        status_koneksi: 'online',
-        status_baterai: 80 + (index * 7) % 21,
-        kabupaten: kab.id,
-        latest_reading: {
-          timestamp: new Date().toISOString(),
-          ph: parseFloat((8.1 + Math.sin(index) * 0.25).toFixed(2)),
-          suhu_celsius: parseFloat((28.2 + Math.cos(index) * 1.1).toFixed(1)),
-          salinitas_ppt: parseFloat((32.5 + Math.sin(index * 2) * 0.8).toFixed(1)),
-          do_mg_l: parseFloat((6.8 + Math.cos(index * 2) * 0.7).toFixed(1)),
-          kekeruhan_ntu: parseFloat((2.1 + Math.abs(Math.sin(index * 3)) * 2).toFixed(1)),
-          health_index: 75 + (index * 4) % 21
-        }
-      });
-      index++;
-    }
-  });
-  
-  return dummySensors;
+  // Filter by kabupaten/wilayah if specific one selected
+  if (kabupatenId && kabupatenId !== 'all') {
+    return realSensors.filter(s =>
+      (s.wilayah || '').toLowerCase() === kabupatenId.toLowerCase() ||
+      s.nama_lokasi.toLowerCase().includes(kabupatenId.toLowerCase())
+    );
+  }
+
+  // Filter by province
+  if (provinceId && provinceId !== 'all') {
+    const keyword = (provMap[provinceId] || provinceId).split(' ')[0];
+    return realSensors.filter(s =>
+      (s.provinsi || '').toLowerCase().includes(keyword)
+    );
+  }
+
+  return realSensors;
 }
 
 const DEPTH_LAYERS = [

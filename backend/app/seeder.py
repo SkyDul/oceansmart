@@ -16,7 +16,7 @@ THRESHOLDS = {
     "suhu_celsius":  {"min": 24.0, "max": 33.0, "warn_min": 25.0, "warn_max": 31.5},
     "salinitas_ppt": {"min": 26.0, "max": 38.0, "warn_min": 28.0, "warn_max": 36.5},
     "do_mg_l":       {"min": 4.0, "max": 14.0, "warn_min": 4.8, "warn_max": 13.0},
-    "kekeruhan_ntu": {"min": 0.0, "max": 25.0, "warn_min": 0.0, "warn_max": 18.0},
+    "kekeruhan_ntu": {"min": 0.0, "max": 25.0, "warn_min": 0.0, "warn_max": 7.0},
 }
 
 # Karakteristik dasar tiap wilayah — berpengaruh ke base value generator
@@ -26,8 +26,8 @@ WILAYAH_PROFILE = {
     "Pangandaran": {"ph_bias": 0.02,  "suhu_bias": 0.0,  "sal_bias": 0.2,  "do_bias": 0.3,  "turb_bias": 0.5,  "anomaly_rate": 0.01},
     "Sukabumi":    {"ph_bias": 0.0,   "suhu_bias": -0.3, "sal_bias": 0.0,  "do_bias": 0.5,  "turb_bias": 0.3,  "anomaly_rate": 0.015},
     # Jawa Barat Utara (Pantura) — lebih tercemar, turbidity lebih tinggi
-    "Indramayu":   {"ph_bias": -0.05, "suhu_bias": 0.5,  "sal_bias": -0.3, "do_bias": -0.4, "turb_bias": 2.0,  "anomaly_rate": 0.04},
-    "Cirebon":           {"ph_bias": -0.08, "suhu_bias": 0.6,  "sal_bias": -0.5, "do_bias": -0.5, "turb_bias": 2.5,  "anomaly_rate": 0.05},
+    "Indramayu":   {"ph_bias": -0.05, "suhu_bias": 0.5,  "sal_bias": -0.3, "do_bias": -0.4, "turb_bias": 4.0,  "anomaly_rate": 0.04},
+    "Cirebon":           {"ph_bias": -0.08, "suhu_bias": 0.6,  "sal_bias": -0.5, "do_bias": -0.5, "turb_bias": 4.5,  "anomaly_rate": 0.05},
     "Karawang":          {"ph_bias": -0.06, "suhu_bias": 0.4,  "sal_bias": -0.4, "do_bias": -0.3, "turb_bias": 1.8,  "anomaly_rate": 0.03},
     "Subang":            {"ph_bias": -0.04, "suhu_bias": 0.3,  "sal_bias": -0.2, "do_bias": -0.2, "turb_bias": 1.5,  "anomaly_rate": 0.025},
     # Bali — kondisi terbaik
@@ -279,7 +279,7 @@ def update_realtime_ocean_cache():
     from datetime import datetime
     
     # Hanya lakukan request baru setiap 5 menit sekali agar tidak diblokir/rate-limit
-    now = datetime.utcnow()
+    now = datetime.now()
     last = REALTIME_OCEAN_CACHE["last_fetched"]
     if last is not None and (now - last).total_seconds() < 300:
         return
@@ -512,7 +512,7 @@ def seed_database(db: Session):
     print(f"  [OK] {len(SENSORS_DATA)} sensors created")
 
     # 3. Generate historical readings (30 hari, setiap 30 menit)
-    now = datetime.utcnow()
+    now = datetime.now()
     total_readings = 0
     total_alerts = 0
     readings_batch = []
@@ -534,12 +534,12 @@ def seed_database(db: Session):
 
                 alert_data = check_thresholds_and_create_alert(reading)
                 if alert_data:
-                    alert_data["created_at"] = reading_time
-                    alert_data["is_resolved"] = day_offset > 0
-                    if day_offset > 0:
-                        alert_data["resolved_at"] = reading_time + timedelta(hours=random.randint(1, 4))
-                    alerts_batch.append(Alert(**alert_data))
-                    total_alerts += 1
+                    # Hanya simpan alert aktif (day_offset == 0) agar tidak menumpuk riwayat resolved
+                    if day_offset == 0:
+                        alert_data["created_at"] = reading_time
+                        alert_data["is_resolved"] = False
+                        alerts_batch.append(Alert(**alert_data))
+                        total_alerts += 1
 
             if len(readings_batch) >= 500:
                 db.bulk_save_objects(readings_batch)

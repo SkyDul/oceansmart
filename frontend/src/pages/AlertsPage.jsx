@@ -46,47 +46,129 @@ export default function AlertsPage() {
     ? sensors
     : sensors.filter(s => (s.wilayah || '').toLowerCase() === selectedWilayah.toLowerCase());
 
-  const filteredAlerts = alerts.filter(a => {
-    if (activeOnly && a.is_resolved) return false;
-    if (selectedPriority !== 'all' && a.level !== selectedPriority) return false;
+  // Generate list of card items (some sensors have active alerts -> show a card for each alert.
+  // Other sensors have no active alerts -> show one NORMAL card for the sensor).
+  const cardItems = [];
+  
+  sensors.forEach(sensor => {
+    const activeAlertsForSensor = (alerts || []).filter(
+      a => a.sensor_id === sensor.sensor_id && !a.is_resolved
+    );
+
+    if (activeAlertsForSensor.length > 0) {
+      activeAlertsForSensor.forEach(alert => {
+        cardItems.push({
+          id: alert.id,
+          isAlert: true,
+          sensor_id: sensor.sensor_id,
+          nama_lokasi: sensor.nama_lokasi,
+          wilayah: sensor.wilayah,
+          provinsi: sensor.provinsi,
+          zona: sensor.zona,
+          kedalaman_m: sensor.kedalaman_m,
+          latest_reading: sensor.latest_reading,
+          
+          // Alert specific fields
+          level: alert.level,
+          parameter: alert.parameter,
+          value: alert.value,
+          threshold_min: alert.threshold_min,
+          threshold_max: alert.threshold_max,
+          message: alert.message,
+          created_at: alert.created_at,
+          is_resolved: false,
+          activeAlerts: [alert]
+        });
+      });
+    } else {
+      const healthScore = sensor.latest_reading?.health_index || 100;
+      const timestamp = sensor.latest_reading?.timestamp || sensor.created_at || new Date().toISOString();
+      cardItems.push({
+        id: `normal_${sensor.sensor_id}`,
+        isAlert: false,
+        sensor_id: sensor.sensor_id,
+        nama_lokasi: sensor.nama_lokasi,
+        wilayah: sensor.wilayah,
+        provinsi: sensor.provinsi,
+        zona: sensor.zona,
+        kedalaman_m: sensor.kedalaman_m,
+        latest_reading: sensor.latest_reading,
+        
+        // Normal card specific fields
+        level: 'normal',
+        parameter: 'Kondisi Umum',
+        value: healthScore,
+        threshold_min: 80,
+        threshold_max: 100,
+        message: 'Semua parameter sensor dalam kondisi aman dan normal.',
+        created_at: timestamp,
+        is_resolved: false,
+        activeAlerts: []
+      });
+    }
+  });
+
+  // Filter mapped card items
+  const filteredCards = cardItems.filter(c => {
+    // 1. Filter by Wilayah
     if (selectedWilayah !== 'all') {
-      const sensorInWilayah = activeSensors.some(s => s.sensor_id === a.sensor_id);
-      if (!sensorInWilayah) return false;
+      const inWilayah = c.wilayah && c.wilayah.toLowerCase() === selectedWilayah.toLowerCase();
+      if (!inWilayah) return false;
     }
-    if (selectedSensorId !== 'all' && a.sensor_id !== selectedSensorId) return false;
-    if (selectedDate && a.created_at) {
-      if (new Date(a.created_at).toLocaleDateString('sv-SE') !== selectedDate) return false;
+    // 2. Filter by Sensor ID
+    if (selectedSensorId !== 'all' && c.sensor_id !== selectedSensorId) return false;
+    
+    // 3. Filter by Status/Priority
+    if (selectedPriority !== 'all') {
+      if (c.level !== selectedPriority) return false;
     }
+    
+    // 4. Filter by Date
+    if (selectedDate && c.created_at) {
+      if (new Date(c.created_at).toLocaleDateString('sv-SE') !== selectedDate) return false;
+    }
+    
     return true;
   });
 
-  const sortedAlerts = [...filteredAlerts].sort((a, b) => {
-    // Float unresolved (active) warnings to the top
-    if (!a.is_resolved && b.is_resolved) return -1;
-    if (a.is_resolved && !b.is_resolved) return 1;
-
-    if (sortBy === 'newest') return new Date(b.created_at) - new Date(a.created_at);
-    if (sortBy === 'oldest') return new Date(a.created_at) - new Date(b.created_at);
+  // Sort mapped card items
+  const sortedCards = [...filteredCards].sort((a, b) => {
+    // Sort by level: bahaya > waspada > normal
     if (sortBy === 'level') {
       const score = (lvl) => lvl === 'bahaya' ? 2 : lvl === 'waspada' ? 1 : 0;
       return score(b.level) - score(a.level);
     }
+    
+    // Sort by timestamp
+    const timeA = new Date(a.created_at);
+    const timeB = new Date(b.created_at);
+    
+    if (sortBy === 'newest') return timeB - timeA;
+    if (sortBy === 'oldest') return timeA - timeB;
+    
     return 0;
   });
 
-  const handleResolve = async (id) => {
+  // Handle manual resolution for a specific alert
+  const handleResolveAlert = async (alertId) => {
+    if (!alertId || typeof alertId === 'string' && alertId.startsWith('normal_')) {
+      console.warn('Invalid alertId:', alertId);
+      return;
+    }
     try {
-      await api.patch(`/alerts/${id}/resolve`);
-      setAlerts(prev => prev.map(a => a.id === id ? { ...a, is_resolved: true } : a));
-      if (selectedAlert?.id === id) setSelectedAlert(prev => ({ ...prev, is_resolved: true }));
+      await api.patch(`/alerts/${alertId}/resolve`);
+      // Remove from context immediately for instant UI update
+      setAlerts(prev => prev.filter(a => a.id !== alertId));
+      if (selectedAlert?.id === alertId) setSelectedAlert(null);
     } catch (e) {
       console.error('Gagal menyelesaikan peringatan:', e);
+      alert('Gagal menyelesaikan peringatan: ' + (e.response?.data?.detail || e.message));
     }
   };
 
-  const activeBahaya = filteredAlerts.filter(a => a.level === 'bahaya' && !a.is_resolved).length;
-  const activeWaspada = filteredAlerts.filter(a => a.level === 'waspada' && !a.is_resolved).length;
-  const resolvedCount = filteredAlerts.filter(a => a.is_resolved).length;
+  const activeBahaya = cardItems.filter(c => c.isAlert && c.level === 'bahaya').length;
+  const activeWaspada = cardItems.filter(c => c.isAlert && c.level === 'waspada').length;
+  const activeNormal = cardItems.filter(c => !c.isAlert).length;
 
   return (
     <>
@@ -117,9 +199,6 @@ export default function AlertsPage() {
           </div>
           <p>Sistem notifikasi real-time kawasan konservasi</p>
         </div>
-        <button className={`btn btn-sm ${activeOnly ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveOnly(!activeOnly)}>
-          <Filter size={14} /> {activeOnly ? 'Aktif Saja' : 'Semua Status'}
-        </button>
       </header>
 
       <div className="page-body fade-in">
@@ -131,7 +210,6 @@ export default function AlertsPage() {
             { dot: '#dc2626', label: 'Bahaya', desc: 'Peringatan aktif' },
             { dot: '#d97706', label: 'Waspada', desc: 'Peringatan aktif' },
             { dot: '#10b981', label: 'Normal', desc: 'Kondisi sensor saat ini' },
-            { dot: '#94a3b8', label: 'Terselesaikan', desc: 'Riwayat peringatan selesai' },
           ].map(({ dot, label, desc }) => (
             <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <span style={{ width: 9, height: 9, borderRadius: '50%', background: dot, display: 'inline-block', flexShrink: 0 }} />
@@ -153,6 +231,7 @@ export default function AlertsPage() {
               <option value="all">Semua</option>
               <option value="bahaya">Bahaya</option>
               <option value="waspada">Waspada</option>
+              <option value="normal">Normal</option>
             </select>
           </div>
 
@@ -199,18 +278,18 @@ export default function AlertsPage() {
         {/* Stats */}
         <div className="stats-grid" style={{ marginBottom: '1.5rem' }}>
           {[
-            { label: 'Bahaya', value: activeBahaya, icon: <AlertTriangle size={20} color="#fff" /> },
-            { label: 'Waspada', value: activeWaspada, icon: <Clock size={20} color="#fff" /> },
-            { label: 'Terselesaikan', value: resolvedCount, icon: <Check size={20} color="#fff" /> },
-          ].map(({ label, value, icon }) => (
+            { label: 'Bahaya', value: activeBahaya, icon: <AlertTriangle size={20} color="#fff" />, color: 'linear-gradient(135deg, #ef4444, #b91c1c)' },
+            { label: 'Waspada', value: activeWaspada, icon: <Clock size={20} color="#fff" />, color: 'linear-gradient(135deg, #f59e0b, #d97706)' },
+            { label: 'Normal', value: activeNormal, icon: <Check size={20} color="#fff" />, color: 'linear-gradient(135deg, #10b981, #047857)' },
+          ].map(({ label, value, icon, color }) => (
             <div key={label} style={{
-              background: 'linear-gradient(135deg, #023e8a, #0077b6)',
+              background: color,
               borderRadius: '1rem',
               padding: '1.25rem 1.5rem',
               display: 'flex',
               alignItems: 'center',
               gap: '1rem',
-              boxShadow: '0 4px 16px rgba(2,62,138,0.18)',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
               color: '#fff',
             }}>
               <div style={{ width: 44, height: 44, borderRadius: '0.625rem', background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -250,25 +329,25 @@ export default function AlertsPage() {
           </div>
         </div>
 
-        {sortedAlerts.length === 0 ? (
+        {sortedCards.length === 0 ? (
           <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.875rem', background: '#fff', borderRadius: '0.875rem', border: '1px solid #e2e8f0' }}>
-            Tidak ada peringatan {activeOnly ? 'aktif' : ''} saat ini.
+            Tidak ada peringatan saat ini.
           </div>
         ) : viewMode === 'grid' ? (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
-            {sortedAlerts.map(a => {
-              const resolved = a.is_resolved;
-              const isBahaya = a.level === 'bahaya';
-              const isNormal = a.level === 'normal';
-              const unit = getParamUnit(a.parameter);
-              const valueColor = resolved ? '#64748b' : isBahaya ? '#dc2626' : isNormal ? '#10b981' : '#d97706';
-              const badgeBg = resolved ? '#f1f5f9' : isBahaya ? '#dc2626' : isNormal ? '#e0f2fe' : '#d97706';
-              const badgeColor = resolved ? '#64748b' : isNormal ? '#0369a1' : '#fff';
-              const badgeLabel = resolved ? 'SELESAI' : a.level.toUpperCase();
+            {sortedCards.map(c => {
+              const isDanger = c.level === 'bahaya';
+              const isWarning = c.level === 'waspada';
+              const isNormal = c.level === 'normal';
+              const unit = getParamUnit(c.parameter);
+              const valueColor = isDanger ? '#dc2626' : isNormal ? '#10b981' : '#d97706';
+              const badgeBg = isDanger ? '#dc2626' : isNormal ? '#e0f2fe' : '#d97706';
+              const badgeColor = isNormal ? '#0369a1' : '#fff';
+              const badgeLabel = c.level.toUpperCase();
 
               return (
-                <div key={a.id}
-                  onClick={() => setSelectedAlert(a)}
+                <div key={c.id}
+                  onClick={() => setSelectedAlert(c)}
                   style={{
                     background: '#fff',
                     borderRadius: '0.75rem',
@@ -278,13 +357,12 @@ export default function AlertsPage() {
                     cursor: 'pointer',
                     display: 'flex',
                     flexDirection: 'column',
-                    opacity: resolved ? 0.72 : 1,
                     transition: 'box-shadow 0.15s, transform 0.15s',
                   }}
                   onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 16px rgba(15,23,42,0.10)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
                   onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 1px 6px rgba(15,23,42,0.06)'; e.currentTarget.style.transform = 'translateY(0)'; }}
                 >
-                  <div style={{ padding: '1rem 1.125rem' }}>
+                  <div style={{ padding: '1rem 1.125rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
 
                     {/* Row 1: badge + timestamp */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
@@ -293,45 +371,45 @@ export default function AlertsPage() {
                       </span>
                       <span style={{ fontSize: '0.6875rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 3 }}>
                         <Clock size={11} />
-                        {new Date(a.created_at).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        {new Date(c.created_at).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                       </span>
                     </div>
 
                     {/* Row 2: sensor + parameter */}
                     <div style={{ marginBottom: '0.625rem' }}>
-                      <div style={{ fontSize: '0.9375rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.125rem' }}>{a.sensor_id}</div>
-                      <div style={{ fontSize: '0.8125rem', color: '#64748b', fontWeight: 500, textTransform: 'capitalize' }}>{a.parameter}</div>
+                      <div style={{ fontSize: '0.9375rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.125rem' }}>{c.sensor_id}</div>
+                      <div style={{ fontSize: '0.8125rem', color: '#64748b', fontWeight: 500, textTransform: 'capitalize' }}>{c.parameter}</div>
                     </div>
 
                     {/* Row 3: value + safe range */}
                     <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '0.625rem' }}>
                       <span style={{ fontSize: '1.625rem', fontWeight: 800, color: valueColor, lineHeight: 1, letterSpacing: '-0.02em' }}>
-                        {a.value}<span style={{ fontSize: '0.875rem', fontWeight: 600, marginLeft: 3, color: valueColor }}>{unit}</span>
+                        {c.value}<span style={{ fontSize: '0.875rem', fontWeight: 600, marginLeft: 3, color: valueColor }}>{unit}</span>
                       </span>
                       <span style={{ fontSize: '0.6875rem', color: '#94a3b8', background: '#f8fafc', padding: '2px 8px', borderRadius: 4, border: '1px solid #e2e8f0' }}>
-                        Aman: {a.threshold_min} – {a.threshold_max}
+                        Aman: {c.threshold_min} – {c.threshold_max}
                       </span>
                     </div>
 
                     {/* Row 4: message */}
                     <p style={{ margin: 0, fontSize: '0.8125rem', color: '#64748b', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', minHeight: '2.4em' }}>
-                      {a.message}
+                      {c.message}
                     </p>
                   </div>
 
                   {/* Footer: actions */}
                   <div style={{ borderTop: '1px solid #f1f5f9', padding: '0.625rem 1.125rem', display: 'flex', gap: '0.5rem' }} onClick={e => e.stopPropagation()}>
                     <button
-                      onClick={() => setSelectedAlert(a)}
+                      onClick={() => setSelectedAlert(c)}
                       style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '0.4rem', borderRadius: '0.375rem', border: '1px solid #0369a1', background: 'transparent', fontSize: '0.75rem', fontWeight: 600, color: '#0369a1', cursor: 'pointer', transition: 'all 0.12s' }}
                       onMouseEnter={e => { e.currentTarget.style.background = '#eff6ff'; }}
                       onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
                     >
                       <Eye size={13} /> Lihat Detail <ChevronRight size={12} />
                     </button>
-                    {userRole !== 'pengguna' && !resolved && (
+                    {userRole !== 'pengguna' && !isNormal && (
                       <button
-                        onClick={() => handleResolve(a.id)}
+                        onClick={() => handleResolveAlert(c.id)}
                         style={{ padding: '0.4rem 0.875rem', borderRadius: '0.375rem', border: 'none', background: '#0369a1', fontSize: '0.75rem', fontWeight: 600, color: '#fff', cursor: 'pointer', transition: 'background 0.12s', whiteSpace: 'nowrap' }}
                         onMouseEnter={e => e.currentTarget.style.background = '#075985'}
                         onMouseLeave={e => e.currentTarget.style.background = '#0369a1'}
@@ -344,39 +422,48 @@ export default function AlertsPage() {
               );
             })}
           </div>
-
         ) : (
           /* LIST VIEW */
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            {sortedAlerts.map(a => {
-              const resolved = a.is_resolved;
-              const isBahaya = a.level === 'bahaya';
-              const unit = getParamUnit(a.parameter);
-              const valueColor = resolved ? '#64748b' : isBahaya ? '#dc2626' : '#d97706';
-              const badgeBg = resolved ? '#94a3b8' : isBahaya ? '#dc2626' : '#d97706';
+            {sortedCards.map(c => {
+              const isDanger = c.level === 'bahaya';
+              const isWarning = c.level === 'waspada';
+              const isNormal = c.level === 'normal';
+              const unit = getParamUnit(c.parameter);
+              const valueColor = isDanger ? '#dc2626' : isNormal ? '#10b981' : '#d97706';
+              const badgeBg = isDanger ? '#dc2626' : isNormal ? '#e0f2fe' : '#d97706';
+              const badgeColor = isNormal ? '#0369a1' : '#fff';
+              const badgeLabel = c.level.toUpperCase();
+
               return (
-                <div key={a.id}
-                  onClick={() => setSelectedAlert(a)}
-                  style={{ background: '#fff', borderRadius: '0.625rem', border: '1px solid #e8edf2', boxShadow: '0 1px 4px rgba(15,23,42,0.05)', display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem 1rem', cursor: 'pointer', opacity: resolved ? 0.72 : 1, transition: 'box-shadow 0.12s' }}
+                <div key={c.id}
+                  onClick={() => setSelectedAlert(c)}
+                  style={{ background: '#fff', borderRadius: '0.625rem', border: '1px solid #e8edf2', boxShadow: '0 1px 4px rgba(15,23,42,0.05)', display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem 1rem', cursor: 'pointer', transition: 'box-shadow 0.12s' }}
                   onMouseEnter={e => e.currentTarget.style.boxShadow = '0 3px 10px rgba(15,23,42,0.09)'}
                   onMouseLeave={e => e.currentTarget.style.boxShadow = '0 1px 4px rgba(15,23,42,0.05)'}
                 >
-                  <span style={{ fontSize: '0.6rem', fontWeight: 700, padding: '2px 7px', borderRadius: 3, background: badgeBg, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>
-                    {resolved ? 'SELESAI' : a.level.toUpperCase()}
+                  <span style={{ fontSize: '0.6rem', fontWeight: 700, padding: '2px 7px', borderRadius: 3, background: badgeBg, color: badgeColor, textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>
+                    {badgeLabel}
                   </span>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#0f172a' }}>{a.sensor_id} <span style={{ fontWeight: 500, color: '#64748b' }}>— {a.parameter}</span></div>
-                    <div style={{ fontSize: '0.75rem', color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.message}</div>
+                    <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#0f172a' }}>
+                      {c.sensor_id} <span style={{ fontWeight: 500, color: '#64748b' }}>— {c.parameter}</span>
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {c.message}
+                    </div>
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <span style={{ fontSize: '1.125rem', fontWeight: 800, color: valueColor }}>{a.value}<span style={{ fontSize: '0.75rem', marginLeft: 2 }}>{unit}</span></span>
-                    <div style={{ fontSize: '0.625rem', color: '#94a3b8' }}>Aman: {a.threshold_min}–{a.threshold_max}</div>
+                    <span style={{ fontSize: '1.125rem', fontWeight: 800, color: valueColor }}>
+                      {c.value}<span style={{ fontSize: '0.75rem', marginLeft: 2 }}>{unit}</span>
+                    </span>
+                    <div style={{ fontSize: '0.625rem', color: '#94a3b8' }}>Aman: {c.threshold_min}–{c.threshold_max}</div>
                   </div>
                   <span style={{ fontSize: '0.6875rem', color: '#94a3b8', flexShrink: 0, whiteSpace: 'nowrap' }}>
-                    {new Date(a.created_at).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    {new Date(c.created_at).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                   </span>
-                  {userRole !== 'pengguna' && !resolved && (
-                    <button onClick={e => { e.stopPropagation(); handleResolve(a.id); }} style={{ padding: '4px 10px', borderRadius: '0.375rem', border: 'none', background: '#0369a1', color: '#fff', fontSize: '0.6875rem', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>✓ Selesai</button>
+                  {userRole !== 'pengguna' && !isNormal && (
+                    <button onClick={e => { e.stopPropagation(); handleResolveAlert(c.id); }} style={{ padding: '4px 10px', borderRadius: '0.375rem', border: 'none', background: '#0369a1', color: '#fff', fontSize: '0.6875rem', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>✓ Selesai</button>
                   )}
                 </div>
               );
@@ -394,36 +481,74 @@ export default function AlertsPage() {
             </button>
             <div>
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.5rem' }}>
-                <span style={{ fontSize: '0.625rem', fontWeight: 700, padding: '2px 8px', borderRadius: 3, background: selectedAlert.is_resolved ? '#94a3b8' : selectedAlert.level === 'bahaya' ? '#dc2626' : '#d97706', color: '#fff', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                  {selectedAlert.is_resolved ? 'SELESAI' : selectedAlert.level.toUpperCase()}
+                <span style={{ fontSize: '0.625rem', fontWeight: 700, padding: '2px 8px', borderRadius: 3, background: selectedAlert.level === 'bahaya' ? '#ef4444' : selectedAlert.level === 'waspada' ? '#f59e0b' : '#10b981', color: '#fff', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  {selectedAlert.level.toUpperCase()}
                 </span>
               </div>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0f172a', margin: '0 0 0.25rem' }}>Detail Peringatan</h3>
-              <p style={{ fontSize: '0.8125rem', color: '#94a3b8', margin: 0 }}>{new Date(selectedAlert.created_at).toLocaleString('id-ID')}</p>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0f172a', margin: '0 0 0.25rem' }}>Detail Sensor & Status</h3>
+              <p style={{ fontSize: '0.8125rem', color: '#94a3b8', margin: 0 }}>
+                {new Date(selectedAlert.latest_reading?.timestamp || selectedAlert.created_at || new Date()).toLocaleString('id-ID')}
+              </p>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem', padding: '1rem', background: '#f8fafc', borderRadius: '0.625rem', border: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.8125rem', color: '#64748b' }}>ID Sensor</span>
+                <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#0f172a' }}>{selectedAlert.sensor_id}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.8125rem', color: '#64748b' }}>Lokasi</span>
+                <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#0f172a', textAlign: 'right' }}>{selectedAlert.nama_lokasi}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.8125rem', color: '#64748b' }}>Wilayah / Prov</span>
+                <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#0f172a' }}>{selectedAlert.wilayah} / {selectedAlert.provinsi}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.8125rem', color: '#64748b' }}>Zona / Kedalaman</span>
+                <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#0f172a', textTransform: 'capitalize' }}>{selectedAlert.zona?.replace('_', ' ') || ''} / {selectedAlert.kedalaman_m}m</span>
+              </div>
+              
+              <hr style={{ border: 'none', borderTop: '1px dashed #cbd5e1', margin: '4px 0' }} />
+              
+              <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#475569', marginBottom: '2px' }}>Parameter Saat Ini:</div>
               {[
-                { label: 'ID Sensor', val: selectedAlert.sensor_id },
-                { label: 'Parameter', val: selectedAlert.parameter?.toUpperCase() },
-                { label: 'Nilai Terukur', val: `${selectedAlert.value} ${getParamUnit(selectedAlert.parameter)}`, bold: true, color: selectedAlert.level === 'bahaya' ? '#dc2626' : '#d97706' },
-                { label: 'Batas Aman', val: `${selectedAlert.threshold_min} – ${selectedAlert.threshold_max}`, color: '#0369a1' },
-              ].map(({ label, val, bold, color }) => (
-                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.8125rem', color: '#64748b' }}>{label}</span>
-                  <span style={{ fontSize: '0.875rem', fontWeight: bold ? 700 : 600, color: color || '#0f172a' }}>{val}</span>
-                </div>
-              ))}
+                { label: 'pH Air', val: selectedAlert.latest_reading?.ph, unit: '', range: '7.5 – 8.5', key: 'pH' },
+                { label: 'Suhu Celsius', val: selectedAlert.latest_reading?.suhu_celsius, unit: '°C', range: '26°C – 30°C', key: 'Suhu' },
+                { label: 'Salinitas ppt', val: selectedAlert.latest_reading?.salinitas_ppt, unit: ' ppt', range: '30 – 35 ppt', key: 'Salinitas' },
+                { label: 'DO (Dissolved Oxygen)', val: selectedAlert.latest_reading?.do_mg_l, unit: ' mg/L', range: '5 – 12 mg/L', key: 'Dissolved Oxygen' },
+                { label: 'Kekeruhan NTU', val: selectedAlert.latest_reading?.kekeruhan_ntu, unit: ' NTU', range: '0 – 7 NTU', key: 'Kekeruhan' }
+              ].map(({ label, val, unit, range, key }) => {
+                const activeAlert = selectedAlert.activeAlerts?.find(a => a.parameter === key);
+                const isDanger = activeAlert?.level === 'bahaya';
+                const isWarning = activeAlert?.level === 'waspada';
+                const color = isDanger ? '#ef4444' : isWarning ? '#f59e0b' : '#10b981';
+                
+                return (
+                  <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8125rem' }}>
+                    <span style={{ color: '#64748b', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: color }} />
+                      {label}
+                    </span>
+                    <div style={{ textAlign: 'right' }}>
+                      <span style={{ fontWeight: 700, color: activeAlert ? color : '#0f172a' }}>
+                        {val !== undefined && val !== null ? `${val}${unit}` : 'N/A'}
+                      </span>
+                      <span style={{ fontSize: '0.6875rem', color: '#94a3b8', marginLeft: 6 }}>({range})</span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
             <div>
-              <p style={{ margin: '0 0 0.375rem', fontSize: '0.75rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Pesan</p>
-              <p style={{ margin: 0, fontSize: '0.875rem', color: '#334155', lineHeight: 1.6, padding: '0.75rem', background: '#fff', borderRadius: '0.5rem', border: `1px solid ${selectedAlert.level === 'bahaya' ? '#fecaca' : '#fde68a'}` }}>
+              <p style={{ margin: '0 0 0.375rem', fontSize: '0.75rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Detail Status</p>
+              <p style={{ margin: 0, fontSize: '0.875rem', color: '#334155', lineHeight: 1.6, padding: '0.75rem', background: '#fff', borderRadius: '0.5rem', border: `1px solid ${selectedAlert.level === 'bahaya' ? '#fecaca' : selectedAlert.level === 'waspada' ? '#fde68a' : '#cbd5e1'}` }}>
                 {selectedAlert.message}
               </p>
             </div>
             <div style={{ display: 'flex', gap: '0.625rem' }}>
               <button onClick={() => setSelectedAlert(null)} style={{ flex: 1, padding: '0.6rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0', background: '#fff', color: '#475569', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer' }}>Tutup</button>
-              {userRole !== 'pengguna' && !selectedAlert.is_resolved && (
-                <button onClick={() => handleResolve(selectedAlert.id)} style={{ flex: 1, padding: '0.6rem', borderRadius: '0.5rem', border: 'none', background: '#0369a1', color: '#fff', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer' }}>Tandai Selesai</button>
+              {userRole !== 'pengguna' && selectedAlert.level !== 'normal' && (
+                <button onClick={() => { handleResolveAlert(selectedAlert.id); setSelectedAlert(null); }} style={{ flex: 1, padding: '0.6rem', borderRadius: '0.5rem', border: 'none', background: '#0369a1', color: '#fff', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer' }}>Tandai Selesai</button>
               )}
             </div>
           </div>
