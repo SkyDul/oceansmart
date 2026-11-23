@@ -28,6 +28,14 @@ import modelRoyalGramma from '../assets/models/RoyalGramma.glb';
 import modelSeaUrchin from '../assets/models/SeaUrchin.glb';
 import modelTurbot from '../assets/models/Turbot.glb';
 import modelBlueWhale from '../assets/models/BlueWhale.glb';
+import modelDugong from '../assets/models/Dugong.glb';
+import modelCrab from '../assets/models/Crab.glb';
+import modelClam from '../assets/models/Clam.glb';
+import modelSeal from '../assets/models/Seal.glb';
+import modelLionfish from '../assets/models/Lionfish.glb';
+import modelHawksbill from '../assets/models/HawksbillTurtle.glb';
+import modelKingfish from '../assets/models/Kingfish.glb';
+import modelBlueTang from '../assets/models/BlueTang.glb';
 
 export const MODEL_MAP = {
   'Ikan Badut (Nemo)': modelNemo,
@@ -56,4 +64,12 @@ export const MODEL_MAP = {
   'Bulu Babi': modelSeaUrchin,
   'Ikan Turbot': modelTurbot,
   'Paus Biru': modelBlueWhale,
+  'Dugong (Sapi Laut)': modelDugong,
+  'Kepiting Bakau': modelCrab,
+  'Kima Raksasa': modelClam,
+  'Anjing Laut': modelSeal,
+  'Ikan Lepu Ayam (Lionfish)': modelLionfish,
+  'Penyu Sisik': modelHawksbill,
+  'Ikan Tenggiri': modelKingfish,
+  'Ikan Botana Biru (Blue Tang)': modelBlueTang,
 };

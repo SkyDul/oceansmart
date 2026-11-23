@@ -164,14 +164,33 @@ export default function MapPage() {
               <span style={{ fontSize: '0.8125rem', fontWeight: 800, color: '#0369a1' }}>{userWilayah}</span>
             </div>
           ) : (
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              background: '#f8fafc',
+              border: '1.5px solid #bae6fd',
+              borderRadius: '0.75rem',
+              padding: '0.4rem 0.85rem',
+              boxShadow: '0 2px 6px rgba(2, 132, 199, 0.08)',
+              transition: 'all 0.2s ease'
+            }}>
+              <MapPin size={15} color="#0284c7" style={{ flexShrink: 0 }} />
               <select 
-                className="select select-sm select-bordered" 
                 value={selectedWilayah}
                 onChange={e => setSelectedWilayah(e.target.value)}
-                style={{ fontSize: '0.8125rem', fontWeight: 600, borderColor: '#cbd5e1' }}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  outline: 'none',
+                  fontSize: '0.8125rem',
+                  fontWeight: 700,
+                  color: '#0369a1',
+                  cursor: 'pointer',
+                  paddingRight: '0.25rem'
+                }}
               >
-                <option value="all">Semua Wilayah ({sensors.length})</option>
+                <option value="all" style={{ color: '#0f172a' }}>Semua Wilayah ({sensors.length})</option>
                 {Object.entries(
                   wilayahList.reduce((acc, item) => {
                     const prov = item.provinsi || 'Lainnya';
@@ -180,9 +199,9 @@ export default function MapPage() {
                     return acc;
                   }, {})
                 ).map(([province, items]) => (
-                  <optgroup key={province} label={province}>
+                  <optgroup key={province} label={province} style={{ color: '#475569', fontWeight: 700 }}>
                     {items.map(w => (
-                      <option key={w.wilayah} value={w.wilayah}>{w.wilayah}</option>
+                      <option key={w.wilayah} value={w.wilayah} style={{ color: '#0f172a', fontWeight: 500 }}>{w.wilayah}</option>
                     ))}
                   </optgroup>
                 ))}

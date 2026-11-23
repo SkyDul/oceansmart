@@ -905,6 +905,28 @@ button {
   }
 }
 
+/* ══════════════════════ BIOTA MODAL BACKDROP ══════════════════════ */
+.biota-modal-backdrop {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: var(--sidebar-collapsed-width, 72px);
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 90;
+}
+
+@media (max-width: 768px) {
+  .biota-modal-backdrop {
+    left: 0;
+  }
+}
+
 /* ══════════════════════ SCROLLBAR ══════════════════════ */
 ::-webkit-scrollbar {
   width: 6px;

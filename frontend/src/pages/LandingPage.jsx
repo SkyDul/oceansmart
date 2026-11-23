@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import '@google/model-viewer';
-import botModel from '../assets/models/Fish by Quaternius - ypEYhCImAB.glb';
+import botModel from '../assets/models/bot fish.glb';
 import { ArrowRight, Shield, Activity, Globe, Anchor, Camera, Cpu, Users, Home } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import api from '../api';
