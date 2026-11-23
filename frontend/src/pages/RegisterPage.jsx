@@ -5,7 +5,7 @@ import { useGoogleLogin } from '@react-oauth/google';
 import axios from 'axios';
 import api from '../api';
 
-export default function RegisterPage() {
+export default function RegisterPage({ onLogin }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -36,19 +36,35 @@ export default function RegisterPage() {
         const userInfo = await axios.get('https://www.googleapis.com/oauth2/v3/userinfo', {
           headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
         });
-        await api.post('/register', {
-          nama: userInfo.data.name || userInfo.data.given_name,
+        const res = await api.post('/login/google', {
           email: userInfo.data.email,
-          password: 'google_oauth_registered_account',
+          nama: userInfo.data.name || userInfo.data.given_name,
+          google_id: userInfo.data.sub,
+          picture: userInfo.data.picture
         });
         setIsLoading(false);
-        navigate('/login', { state: { message: 'Registrasi Google berhasil! Silakan masuk.' } });
+        localStorage.setItem('ocean_user', JSON.stringify({
+          id: res.data.id,
+          name: res.data.name,
+          email: res.data.email,
+          picture: userInfo.data.picture,
+          no_hp: res.data.no_hp || ''
+        }));
+        if (onLogin) {
+          onLogin(res.data.role, res.data.wilayah, res.data.provinsi);
+        } else {
+          localStorage.setItem('ocean_role', res.data.role);
+        }
+        navigate('/dashboard');
       } catch (err) {
         setIsLoading(false);
-        setErrorMsg(err.response?.data?.detail || 'Registrasi Google gagal.');
+        setErrorMsg(err.response?.data?.detail || 'Registrasi Google gagal. Pastikan server backend dan database sudah berjalan.');
       }
     },
-    onError: () => setErrorMsg('Registrasi Google gagal.'),
+    onError: (err) => {
+      console.error('Google OAuth error:', err);
+      setErrorMsg('Login/Registrasi Google gagal. Pastikan URL localhost:5173 diizinkan di Google Cloud Console.');
+    },
   });
 
   const inputStyle = {

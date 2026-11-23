@@ -17,7 +17,7 @@ export default function AlertsPage() {
   const [sensors, setSensors] = useState([]);
   const [wilayahList, setWilayahList] = useState([]);
   const [activeOnly, setActiveOnly] = useState(false);
-  const [selectedPriority, setSelectedPriority] = useState('all');
+  const [selectedPriority, setSelectedPriority] = useState('alerts_only');
   const [selectedAlert, setSelectedAlert] = useState(null);
   const [viewMode, setViewMode] = useState('grid');
   const [sortBy, setSortBy] = useState('newest');
@@ -119,7 +119,9 @@ export default function AlertsPage() {
     if (selectedSensorId !== 'all' && c.sensor_id !== selectedSensorId) return false;
     
     // 3. Filter by Status/Priority
-    if (selectedPriority !== 'all') {
+    if (selectedPriority === 'alerts_only') {
+      if (c.level !== 'bahaya' && c.level !== 'waspada') return false;
+    } else if (selectedPriority !== 'all') {
       if (c.level !== selectedPriority) return false;
     }
     
@@ -228,10 +230,11 @@ export default function AlertsPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '0.4rem', padding: '0.25rem 0.6rem' }}>
             <span style={{ fontSize: '0.6875rem', fontWeight: 600, color: '#64748b' }}>Prioritas:</span>
             <select value={selectedPriority} onChange={e => setSelectedPriority(e.target.value)} style={{ border: 'none', background: 'transparent', outline: 'none', fontWeight: 600, color: '#0f172a', fontSize: '0.8125rem', cursor: 'pointer' }}>
-              <option value="all">Semua</option>
-              <option value="bahaya">Bahaya</option>
-              <option value="waspada">Waspada</option>
-              <option value="normal">Normal</option>
+              <option value="alerts_only">Peringatan Aktif (Bahaya & Waspada)</option>
+              <option value="bahaya">Bahaya Saja</option>
+              <option value="waspada">Waspada Saja</option>
+              <option value="normal">Sensor Normal</option>
+              <option value="all">Semua Status</option>
             </select>
           </div>
 
@@ -278,20 +281,27 @@ export default function AlertsPage() {
         {/* Stats */}
         <div className="stats-grid" style={{ marginBottom: '1.5rem' }}>
           {[
-            { label: 'Bahaya', value: activeBahaya, icon: <AlertTriangle size={20} color="#fff" />, color: 'linear-gradient(135deg, #ef4444, #b91c1c)' },
-            { label: 'Waspada', value: activeWaspada, icon: <Clock size={20} color="#fff" />, color: 'linear-gradient(135deg, #f59e0b, #d97706)' },
-            { label: 'Normal', value: activeNormal, icon: <Check size={20} color="#fff" />, color: 'linear-gradient(135deg, #10b981, #047857)' },
-          ].map(({ label, value, icon, color }) => (
-            <div key={label} style={{
-              background: color,
-              borderRadius: '1rem',
-              padding: '1.25rem 1.5rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '1rem',
-              boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
-              color: '#fff',
-            }}>
+            { key: 'bahaya', label: 'Bahaya', value: activeBahaya, icon: <AlertTriangle size={20} color="#fff" />, color: 'linear-gradient(135deg, #ef4444, #b91c1c)' },
+            { key: 'waspada', label: 'Waspada', value: activeWaspada, icon: <Clock size={20} color="#fff" />, color: 'linear-gradient(135deg, #f59e0b, #d97706)' },
+            { key: 'normal', label: 'Normal', value: activeNormal, icon: <Check size={20} color="#fff" />, color: 'linear-gradient(135deg, #10b981, #047857)' },
+          ].map(({ key, label, value, icon, color }) => (
+            <div
+              key={label}
+              onClick={() => setSelectedPriority(prev => prev === key ? 'alerts_only' : key)}
+              title={`Klik untuk filter ${label}`}
+              style={{
+                background: color,
+                borderRadius: '1rem',
+                padding: '1.25rem 1.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '1rem',
+                boxShadow: selectedPriority === key ? '0 0 0 3px #0f172a' : '0 4px 16px rgba(0,0,0,0.06)',
+                color: '#fff',
+                cursor: 'pointer',
+                transition: 'transform 0.15s, box-shadow 0.15s',
+              }}
+            >
               <div style={{ width: 44, height: 44, borderRadius: '0.625rem', background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 {icon}
               </div>
@@ -330,11 +340,31 @@ export default function AlertsPage() {
         </div>
 
         {sortedCards.length === 0 ? (
-          <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.875rem', background: '#fff', borderRadius: '0.875rem', border: '1px solid #e2e8f0' }}>
-            Tidak ada peringatan saat ini.
-          </div>
+          selectedPriority === 'alerts_only' ? (
+            <div style={{ padding: '2.5rem 1.5rem', textAlign: 'center', background: 'linear-gradient(135deg, #ecfdf5, #f0fdf4)', borderRadius: '0.875rem', border: '1px solid #a7f3d0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Check size={24} color="#fff" />
+              </div>
+              <div style={{ fontSize: '1rem', fontWeight: 700, color: '#065f46' }}>
+                Semua {activeSensors.length} Sensor di {selectedWilayah === 'all' ? 'Seluruh Wilayah' : selectedWilayah} dalam Kondisi Aman
+              </div>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: '#047857' }}>
+                Tidak ada peringatan Bahaya maupun Waspada yang aktif saat ini.
+              </p>
+              <button
+                onClick={() => setSelectedPriority('normal')}
+                style={{ marginTop: '0.25rem', padding: '0.45rem 1rem', borderRadius: '0.5rem', border: '1px solid #10b981', background: '#fff', color: '#047857', fontWeight: 600, fontSize: '0.8125rem', cursor: 'pointer' }}
+              >
+                Lihat Daftar Sensor Normal ({activeNormal})
+              </button>
+            </div>
+          ) : (
+            <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.875rem', background: '#fff', borderRadius: '0.875rem', border: '1px solid #e2e8f0' }}>
+              Tidak ada data sensor pada filter ini.
+            </div>
+          )
         ) : viewMode === 'grid' ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
             {sortedCards.map(c => {
               const isDanger = c.level === 'bahaya';
               const isWarning = c.level === 'waspada';

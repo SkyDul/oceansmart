@@ -1,25 +1,34 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { AlertProvider } from './components/AlertNotifier';
 import Sidebar from './components/Sidebar';
-import Dashboard from './pages/Dashboard';
-import MapPage from './pages/MapPage';
-import MonitoringPage from './pages/MonitoringPage';
-import BiotaPage from './pages/BiotaPage';
-import AlertsPage from './pages/AlertsPage';
-import DigitalTwinPage from './pages/DigitalTwinPage';
-import LandingPage from './pages/LandingPage';
-import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
-import OperatorPage from './pages/OperatorPage';
-import SensorFormPage from './pages/SensorFormPage';
-import BiotaFormPage from './pages/BiotaFormPage';
-import OperatorAccountFormPage from './pages/OperatorAccountFormPage';
-import ProfilePage from './pages/ProfilePage';
 import ChatbotWidget from './components/ChatbotWidget';
-import TermsPage from './pages/TermsPage';
 import './index.css';
+
+// Lazy-loaded pages (code splitting agar loading awal di HP nelayan sangat ringan)
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const MapPage = lazy(() => import('./pages/MapPage'));
+const MonitoringPage = lazy(() => import('./pages/MonitoringPage'));
+const BiotaPage = lazy(() => import('./pages/BiotaPage'));
+const AlertsPage = lazy(() => import('./pages/AlertsPage'));
+const DigitalTwinPage = lazy(() => import('./pages/DigitalTwinPage'));
+const SimulatorPage = lazy(() => import('./pages/SimulatorPage'));
+const LandingPage = lazy(() => import('./pages/LandingPage'));
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const RegisterPage = lazy(() => import('./pages/RegisterPage'));
+const OperatorPage = lazy(() => import('./pages/OperatorPage'));
+const SensorFormPage = lazy(() => import('./pages/SensorFormPage'));
+const BiotaFormPage = lazy(() => import('./pages/BiotaFormPage'));
+const OperatorAccountFormPage = lazy(() => import('./pages/OperatorAccountFormPage'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+const TermsPage = lazy(() => import('./pages/TermsPage'));
+
+const PageLoader = () => (
+  <div className="loading-container" style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div className="spinner" />
+  </div>
+);
 
 // Layout pembungkus untuk halaman yang memerlukan autentikasi
 const ProtectedLayout = ({ children }) => {
@@ -84,6 +93,7 @@ function App() {
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
       <BrowserRouter>
         <AlertProvider>
+          <Suspense fallback={<PageLoader />}>
           <Routes>
             {/* Public Routes */}
             <Route path="/" element={<LandingPage />} />
@@ -91,7 +101,7 @@ function App() {
               isAuthenticated ? <Navigate to="/dashboard" /> : <LoginPage onLogin={handleLogin} />
             } />
             <Route path="/register" element={
-              isAuthenticated ? <Navigate to="/dashboard" /> : <RegisterPage />
+              isAuthenticated ? <Navigate to="/dashboard" /> : <RegisterPage onLogin={handleLogin} />
             } />
             <Route path="/terms" element={<TermsPage />} />
 
@@ -120,6 +130,7 @@ function App() {
           {/* Fallback */}
           <Route path="*" element={<Navigate to={isAuthenticated ? "/dashboard" : "/"} />} />
         </Routes>
+        </Suspense>
       </AlertProvider>
       </BrowserRouter>
     </GoogleOAuthProvider>

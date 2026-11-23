@@ -860,6 +860,51 @@ button {
   }
 }
 
+/* ══════════════════════ OCEANBOT RESPONSIVE ══════════════════════ */
+.oceanbot-wrapper {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 2rem;
+  z-index: 9999;
+}
+
+.oceanbot-window {
+  width: 380px;
+  height: 540px;
+  display: flex;
+  flex-direction: column;
+  border-radius: 1.25rem;
+  background: var(--surface, #ffffff);
+  box-shadow: 0 16px 48px rgba(2, 62, 138, 0.22), 0 2px 10px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(2, 62, 138, 0.12);
+  overflow: hidden;
+  animation: oceanbotSlideUp 0.22s ease-out;
+}
+
+@keyframes oceanbotSlideUp {
+  from { opacity: 0; transform: translateY(14px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (max-width: 640px) {
+  .oceanbot-wrapper.is-open {
+    bottom: 0.75rem;
+    right: 0.75rem;
+    left: 0.75rem;
+  }
+
+  .oceanbot-wrapper {
+    bottom: 1.25rem;
+    right: 1.25rem;
+  }
+
+  .oceanbot-window {
+    width: 100%;
+    height: min(82vh, 580px);
+    border-radius: 1.125rem;
+  }
+}
+
 /* ══════════════════════ SCROLLBAR ══════════════════════ */
 ::-webkit-scrollbar {
   width: 6px;

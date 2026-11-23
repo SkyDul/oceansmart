@@ -1252,6 +1252,10 @@ async def chatbot_message(
                 context += f"\n{b.nama_umum} ({b.nama_ilmiah}): Zona {b.zona_kedalaman}, Status IUCN: {b.status_konservasi}. {b.deskripsi or ''} Habitat: {b.habitat or '-'}"
 
     from app.config import GEMINI_API_KEY, MISTRAL_API_KEY
+    from dotenv import load_dotenv
+    load_dotenv(override=True)
+    gemini_key = os.getenv("GEMINI_API_KEY", GEMINI_API_KEY)
+    mistral_key = os.getenv("MISTRAL_API_KEY", MISTRAL_API_KEY)
     import httpx
 
     user_prompt = (
@@ -1260,46 +1264,48 @@ async def chatbot_message(
     )
 
     # --- Try Gemini ---
-    if GEMINI_API_KEY:
-        try:
-            async with httpx.AsyncClient(timeout=30) as client:
-                resp = await client.post(
-                    f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}",
-                    json={
-                        "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
-                        "contents": [{"parts": [{"text": user_prompt}]}],
-                    },
-                )
-                if resp.status_code == 200:
-                    data = resp.json()
-                    text = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
-                    if text:
-                        return {"reply": clean_reply(text), "context_used": True}
-        except Exception:
-            pass
+    if gemini_key:
+        for gemini_model in ["gemini-3.5-flash", "gemini-3.8-flash", "gemini-flash-latest"]:
+            try:
+                async with httpx.AsyncClient(timeout=30) as client:
+                    resp = await client.post(
+                        f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_model}:generateContent?key={gemini_key}",
+                        json={
+                            "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
+                            "contents": [{"parts": [{"text": user_prompt}]}],
+                        },
+                    )
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        text = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+                        if text:
+                            return {"reply": clean_reply(text), "context_used": True}
+            except Exception:
+                pass
 
     # --- Try Mistral ---
-    if MISTRAL_API_KEY:
-        try:
-            async with httpx.AsyncClient(timeout=30) as client:
-                resp = await client.post(
-                    "https://api.mistral.ai/v1/chat/completions",
-                    headers={"Authorization": f"Bearer {MISTRAL_API_KEY}", "Content-Type": "application/json"},
-                    json={
-                        "model": "mistral-small-latest",
-                        "messages": [
-                            {"role": "system", "content": SYSTEM_PROMPT},
-                            {"role": "user", "content": user_prompt}
-                        ]
-                    }
-                )
-                if resp.status_code == 200:
-                    data = resp.json()
-                    text = data.get("choices", [{}])[0].get("message", {}).get("content", "")
-                    if text:
-                        return {"reply": clean_reply(text), "context_used": True}
-        except Exception:
-            pass
+    if mistral_key:
+        for mistral_model in ["open-mistral-nemo", "mistral-small-latest", "open-mistral-7b"]:
+            try:
+                async with httpx.AsyncClient(timeout=30) as client:
+                    resp = await client.post(
+                        "https://api.mistral.ai/v1/chat/completions",
+                        headers={"Authorization": f"Bearer {mistral_key}", "Content-Type": "application/json"},
+                        json={
+                            "model": mistral_model,
+                            "messages": [
+                                {"role": "system", "content": SYSTEM_PROMPT},
+                                {"role": "user", "content": user_prompt}
+                            ]
+                        }
+                    )
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        text = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+                        if text:
+                            return {"reply": clean_reply(text), "context_used": True}
+            except Exception:
+                pass
 
     # --- Offline fallback — still uses real data ---
     # Helper: strip all markdown from offline replies
@@ -1408,6 +1414,277 @@ async def chatbot_message(
     return {
         "reply": f"📋 Berikut ringkasan kondisi OceanSmart saat ini:\n\n{context[:800]}...\n\nSilakan tanyakan lebih spesifik, misalnya: *'kondisi OS-SENSOR-001'* atau *'ada peringatan apa?'*",
         "context_used": True
+    }
+
+
+VISION_SYSTEM_PROMPT = """Kamu adalah OceanBot, sistem pakar identifikasi citra biota laut OceanSmart untuk nelayan dan konservasi laut Indonesia.
+
+TUGAS UTAMA:
+Analisis gambar yang diberikan dan tentukan secara KETAT apakah objek utama di dalam gambar adalah IKAN atau BIOTA LAUT (karang, penyu, kepiting, udang, cumi, gurita, bintang laut, ubur-ubur, mamalia laut, dll), atau BUKAN (seperti kuda, kucing, anjing, manusia, meja, HP, mobil, motor, makanan darat, tumbuhan darat, gambar polos).
+
+ATURAN PENILAIAN:
+- Jika gambar adalah hewan darat (misal: kuda, sapi, kucing, burung), benda mati, kendaraan, pemandangan tanpa biota laut, atau manusia -> is_marine_biota WAJIB false!
+- Berikan skor confidence (0 sampai 100) yang jujur berdasarkan kejelasan fitur morfologi (sirip, sisik, insang, cangkang, tentakel, struktur karang).
+
+OUTPUT WAJIB BERUPA JSON MURNI dengan struktur berikut:
+{
+  "is_marine_biota": true atau false,
+  "category": "ikan" | "biota_laut_lain" | "hewan_darat" | "benda_mati" | "tumbuhan_darat" | "manusia" | "tidak_jelas",
+  "detected_object": "Nama objek yang terdeteksi (misal: Kuda, Kursi Kayu, atau Ikan Kerapu Sunu)",
+  "confidence": angka 0-100,
+  "fisherman_report": "Jika is_marine_biota true, isi laporan lengkap tanpa tanda ** (bold) dengan format:\n🐟 Nama Biota: [Nama Lokal/Umum] ([Nama Ilmiah])\n⚠️ Keamanan & Racun: [Aman dikonsumsi / BERACUN / BERDURI SENGAT / Hati-hati saat memegang]\n⚖️ Status Hukum & Konservasi: [Boleh ditangkap / DILINDUNGI PENUH — Wajib dilepaskan! / Status IUCN]\n🌊 Habitat & Nilai: [1-2 kalimat tentang habitat & nilai ekonomis]\n💡 Saran Nelayan: [Instruksi praktis penanganan di lapangan]"
+}"""
+
+
+def analyze_image_digital_metrics(image_base64: str) -> dict:
+    """Analisis kualitas citra digital menggunakan OpenCV & NumPy sebelum masuk ke AI Vision."""
+    import base64
+    import numpy as np
+    import cv2
+
+    try:
+        img_bytes = base64.b64decode(image_base64)
+        np_arr = np.frombuffer(img_bytes, dtype=np.uint8)
+        img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+        if img is None:
+            return {"valid": False, "reason": "File gambar rusak atau format tidak didukung."}
+
+        h, w = img.shape[:2]
+        if w < 64 or h < 64:
+            return {"valid": False, "reason": f"Resolusi gambar terlalu kecil ({w}x{h} px). Minimal 64x64 px."}
+
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+        # 1. Standar deviasi intensitas piksel (menolak gambar polos/blank)
+        std_dev = float(np.std(gray))
+        # 2. Entropi Shannon citra (mengukur kekayaan informasi tekstur)
+        hist = cv2.calcHist([gray], [0], None, [256], [0, 256]).flatten()
+        hist_norm = hist / hist.sum()
+        hist_nz = hist_norm[hist_norm > 0]
+        entropy = float(-np.sum(hist_nz * np.log2(hist_nz)))
+        # 3. Laplacian variance (mengukur ketajaman / deteksi blur ekstrem)
+        lap_var = float(cv2.Laplacian(gray, cv2.CV_64F).var())
+
+        if std_dev < 10.0 or entropy < 2.5:
+            return {
+                "valid": False,
+                "reason": (
+                    f"🚫 Foto Ditolak (Pra-Validasi Citra Digital)\n\n"
+                    f"Gambar terdeteksi polos, gelap total, atau tidak memiliki objek yang jelas "
+                    f"(Standar Deviasi: {std_dev:.1f} < 10.0, Entropi: {entropy:.2f} bit < 2.5).\n\n"
+                    f"Silakan foto ikan atau biota laut dengan pencahayaan yang cukup ya! 📸"
+                ),
+                "metrics": {"width": w, "height": h, "std_dev": round(std_dev, 2), "entropy": round(entropy, 2), "sharpness": round(lap_var, 2)}
+            }
+
+        if lap_var < 12.0:
+            return {
+                "valid": False,
+                "reason": (
+                    f"⚠️ Foto Terlalu Buram / Kabur (Pra-Validasi Citra Digital)\n\n"
+                    f"Tingkat ketajaman citra terlalu rendah (Laplacian Variance: {lap_var:.1f} < 12.0). "
+                    f"Kamera mungkin goyang atau tidak fokus.\n\n"
+                    f"Mohon ambil foto ulang yang lebih tajam agar ikan dapat diidentifikasi akurat! 📸"
+                ),
+                "metrics": {"width": w, "height": h, "std_dev": round(std_dev, 2), "entropy": round(entropy, 2), "sharpness": round(lap_var, 2)}
+            }
+
+        return {
+            "valid": True,
+            "metrics": {"width": w, "height": h, "std_dev": round(std_dev, 2), "entropy": round(entropy, 2), "sharpness": round(lap_var, 2)}
+        }
+    except Exception:
+        return {"valid": False, "reason": "Gagal memproses citra digital. Pastikan file berupa gambar JPG/PNG yang valid."}
+
+
+def evaluate_vision_result(raw_text: str, digital_metrics: dict) -> dict:
+    """Parse JSON AI Vision dan terapkan batasan confidence >= 75% khusus biota laut."""
+    import json
+    import re
+
+    # Extract JSON if wrapped in markdown code fence
+    cleaned = raw_text.strip()
+    fence_match = re.search(r"\{.*\}", cleaned, re.DOTALL)
+    if fence_match:
+        cleaned = fence_match.group(0)
+
+    try:
+        parsed = json.loads(cleaned)
+    except Exception:
+        return {"reply": clean_reply(raw_text), "vision_used": True, "accepted": True}
+
+    is_marine = bool(parsed.get("is_marine_biota", False))
+    category = str(parsed.get("category", "tidak_jelas")).lower()
+    detected = str(parsed.get("detected_object", "Objek tidak dikenal"))
+    confidence = int(parsed.get("confidence", 0))
+    report = str(parsed.get("fisherman_report", ""))
+
+    category_labels = {
+        "hewan_darat": "Hewan Darat",
+        "benda_mati": "Benda Mati",
+        "tumbuhan_darat": "Tumbuhan Darat",
+        "manusia": "Manusia",
+        "tidak_jelas": "Tidak Jelas"
+    }
+
+    # Tolak keras jika bukan biota laut
+    if not is_marine or category not in ("ikan", "biota_laut_lain"):
+        cat_label = category_labels.get(category, "Bukan Biota Laut")
+        return {
+            "reply": (
+                f"🚫 Foto Ditolak — Bukan Biota Laut\n\n"
+                f"Sistem mendeteksi gambar ini sebagai: {detected} ({cat_label}, Keyakinan: {confidence}%).\n\n"
+                f"Scanner OceanBot hanya dikhususkan untuk ikan, karang, dan biota laut. "
+                f"Silakan foto ikan atau biota laut yang ingin Anda cek ya! 🐟📸"
+            ),
+            "vision_used": True,
+            "accepted": False,
+            "confidence": confidence,
+            "category": category,
+            "digital_metrics": digital_metrics,
+        }
+
+    # Tolak jika keyakinan di bawah ambang batas 75%
+    if confidence < 75:
+        return {
+            "reply": (
+                f"⚠️ Tingkat Keyakinan Terlalu Rendah ({confidence}% < 75%)\n\n"
+                f"Objek terlihat mirip {detected}, namun ciri morfologi biota laut belum cukup jelas untuk dipastikan keamanannya.\n\n"
+                f"Silakan foto ulang dari jarak lebih dekat dan pastikan pencahayaan terang agar tidak salah identifikasi! 📸"
+            ),
+            "vision_used": True,
+            "accepted": False,
+            "confidence": confidence,
+            "category": category,
+            "digital_metrics": digital_metrics,
+        }
+
+    return {
+        "reply": clean_reply(report) if report else clean_reply(raw_text),
+        "vision_used": True,
+        "accepted": True,
+        "confidence": confidence,
+        "category": category,
+        "digital_metrics": digital_metrics,
+    }
+
+
+@app.post("/api/chatbot/vision")
+async def chatbot_vision(
+    body: dict,
+    db: Session = Depends(get_db),
+    x_user_role: Optional[str] = Header(None),
+):
+    """Identify marine biota from an uploaded/captured image with Digital Image Processing + Confidence Gate."""
+    image_base64 = body.get("image_base64", "")
+    mime_type = body.get("mime_type", "image/jpeg")
+    message = body.get("message", "").strip()
+
+    if not image_base64:
+        raise HTTPException(status_code=400, detail="Foto tidak ditemukan")
+
+    if "," in image_base64:
+        header_part, image_base64 = image_base64.split(",", 1)
+        if "image/" in header_part and ";" in header_part:
+            mime_type = header_part.split(":")[1].split(";")[0]
+
+    # --- TAHAP 1: Pra-Validasi Citra Digital (OpenCV & NumPy) ---
+    dip_check = analyze_image_digital_metrics(image_base64)
+    if not dip_check.get("valid"):
+        return {
+            "reply": dip_check.get("reason"),
+            "vision_used": False,
+            "accepted": False,
+            "digital_metrics": dip_check.get("metrics", {})
+        }
+    digital_metrics = dip_check.get("metrics", {})
+
+    # --- TAHAP 2: Klasifikasi AI Vision + Ambang Batas Keyakinan (>= 75%) ---
+    biota_list = db.query(Biota).all()
+    biota_context = ""
+    if biota_list:
+        biota_context = "\nReferensi Database Biota OceanSmart (cocokkan jika sesuai):\n" + "\n".join(
+            f"- {b.nama_umum} ({b.nama_ilmiah}): Zona {b.zona_kedalaman}, Status {b.status_konservasi}"
+            for b in biota_list
+        )
+
+    user_text = (
+        f"Pengguna ({x_user_role or 'nelayan/pengguna'}) mengirim foto ini."
+        + (f" Pertanyaan tambahan: {message}" if message else " Evaluasi apakah ini biota laut atau bukan.")
+        + biota_context
+    )
+
+    from app.config import GEMINI_API_KEY, MISTRAL_API_KEY
+    from dotenv import load_dotenv
+    load_dotenv(override=True)
+    gemini_key = os.getenv("GEMINI_API_KEY", GEMINI_API_KEY)
+    mistral_key = os.getenv("MISTRAL_API_KEY", MISTRAL_API_KEY)
+    import httpx
+
+    if gemini_key:
+        for gemini_model in ["gemini-3.5-flash", "gemini-3.8-flash", "gemini-flash-latest"]:
+            try:
+                async with httpx.AsyncClient(timeout=40) as client:
+                    resp = await client.post(
+                        f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_model}:generateContent?key={gemini_key}",
+                        json={
+                            "system_instruction": {"parts": [{"text": VISION_SYSTEM_PROMPT}]},
+                            "contents": [{
+                                "parts": [
+                                    {"text": user_text},
+                                    {
+                                        "inline_data": {
+                                            "mime_type": mime_type,
+                                            "data": image_base64
+                                        }
+                                    }
+                                ]
+                            }],
+                            "generationConfig": {"response_mime_type": "application/json"}
+                        },
+                    )
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        text = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+                        if text:
+                            return evaluate_vision_result(text, digital_metrics)
+            except Exception:
+                pass
+
+    if mistral_key:
+        for pixtral_model in ["pixtral-12b-2409", "pixtral-large-latest"]:
+            try:
+                async with httpx.AsyncClient(timeout=40) as client:
+                    resp = await client.post(
+                        "https://api.mistral.ai/v1/chat/completions",
+                        headers={"Authorization": f"Bearer {mistral_key}", "Content-Type": "application/json"},
+                        json={
+                            "model": pixtral_model,
+                            "response_format": {"type": "json_object"},
+                            "messages": [
+                                {"role": "system", "content": VISION_SYSTEM_PROMPT},
+                                {
+                                    "role": "user",
+                                    "content": [
+                                        {"type": "text", "text": user_text},
+                                        {"type": "image_url", "image_url": f"data:{mime_type};base64,{image_base64}"}
+                                    ]
+                                }
+                            ]
+                        }
+                    )
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        text = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+                        if text:
+                            return evaluate_vision_result(text, digital_metrics)
+            except Exception:
+                pass
+
+    return {
+        "reply": "⚠️ Maaf, sistem AI Vision sedang sibuk atau koneksi internet terputus. Pastikan koneksi aktif lalu coba foto ulang ya.",
+        "vision_used": False,
+        "accepted": False
     }
 
 
@@ -1733,19 +2010,31 @@ def login_google(body: dict, db: Session = Depends(get_db)):
     email = body.get("email")
     nama = body.get("nama")
     google_id = body.get("google_id")
+    picture = body.get("picture")
     
     if not email:
         raise HTTPException(status_code=400, detail="Email Google tidak valid")
         
     user = db.query(User).filter(User.email == email).first()
     if not user:
-        raise HTTPException(
-            status_code=404, 
-            detail="Akun Google Anda belum terdaftar. Silakan daftar terlebih dahulu."
+        # Otomatis daftarkan user baru jika belum ada di database
+        user = User(
+            email=email,
+            nama=nama or email.split("@")[0],
+            google_id=google_id,
+            foto_url=picture,
+            password_hash="google_oauth_registered",
+            role="pengguna"
         )
-        
-    if not user.google_id:
-        user.google_id = google_id
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    else:
+        # Jika akun sudah ada di database, sinkronkan google_id dan foto
+        if google_id and not user.google_id:
+            user.google_id = google_id
+        if picture and not user.foto_url:
+            user.foto_url = picture
         db.commit()
         
     return {
@@ -1757,7 +2046,7 @@ def login_google(body: dict, db: Session = Depends(get_db)):
         "provinsi": user.provinsi,
         "wilayah": user.wilayah,
         "no_hp": user.no_hp or "",
-        "picture": getattr(user, "foto_url", None)
+        "picture": getattr(user, "foto_url", None) or picture
     }
 
 

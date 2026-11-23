@@ -243,8 +243,8 @@ export default function MapPage() {
         <div style={{ flex: 1, height: '100%', borderRadius: '1rem', overflow: 'hidden', border: '1px solid #cbd5e1', background: '#ffffff', boxShadow: '0 4px 16px rgba(0,0,0,0.03)', position: 'relative' }}>
           <MapContainer center={center} zoom={13} style={{ height: '100%', width: '100%' }}>
             <TileLayer
-              url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-              attribution='&copy; <a href="https://carto.com/">CARTO</a>'
+              url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             />
 
             {/* Map dynamic controller for flyTo */}

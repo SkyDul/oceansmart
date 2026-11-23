@@ -12,6 +12,22 @@ import api from '../api';
 import { PROVINCES, KABUPATEN_BY_PROVINCE } from '../constants/regions';
 
 
+const PROVINCE_MATCHERS = {
+  jabar:  (p) => p.includes('jawa barat') || p === 'jabar',
+  banten: (p) => p.includes('banten'),
+  dki:    (p) => p.includes('jakarta') || p.includes('dki'),
+  jateng: (p) => p.includes('jawa tengah') || p === 'jateng',
+  jatim:  (p) => p.includes('jawa timur') || p === 'jatim',
+  diy:    (p) => p.includes('yogyakarta') || p.includes('diy'),
+  bali:   (p) => p.includes('bali'),
+  sulsel: (p) => p.includes('sulawesi selatan') || p === 'sulsel',
+  sultra: (p) => p.includes('sulawesi tenggara') || p === 'sultra',
+  sulut:  (p) => p.includes('sulawesi utara') || p === 'sulut',
+  ntt:    (p) => p.includes('nusa tenggara timur') || p === 'ntt',
+  maluku: (p) => p.includes('maluku'),
+  papua:  (p) => p.includes('papua'),
+};
+
 function getSensorsForProvinceAndKabupaten(provinceId, kabupatenId, realSensors) {
   // Single source of truth — semua dari DB via API
   // Filter berdasarkan wilayah/kabupaten kalau dipilih spesifik
@@ -22,18 +38,15 @@ function getSensorsForProvinceAndKabupaten(provinceId, kabupatenId, realSensors)
     );
   }
 
-  // Filter berdasarkan provinsi
+  // Filter berdasarkan provinsi secara akurat (tanpa tabrakan 'jawa' / 'barat' / 'timur')
   if (provinceId && provinceId !== 'all') {
-    const provMap = {
-      'jabar': 'jawa barat', 'banten': 'banten', 'dki': 'jakarta',
-      'jateng': 'jawa tengah', 'jatim': 'jawa timur', 'diy': 'yogyakarta',
-      'bali': 'bali', 'ntt': 'nusa tenggara timur', 'sultra': 'sulawesi tenggara',
-      'sulut': 'sulawesi utara', 'maluku': 'maluku', 'papua': 'papua',
-    };
-    const keyword = provMap[provinceId] || provinceId;
-    return realSensors.filter(s =>
-      (s.provinsi || '').toLowerCase().includes(keyword.split(' ')[0])
-    );
+    const matcher = PROVINCE_MATCHERS[provinceId];
+    if (matcher) {
+      return realSensors.filter(s => matcher((s.provinsi || '').toLowerCase()));
+    }
+    const provObj = PROVINCES.find(p => p.id === provinceId);
+    const targetName = (provObj?.name || provinceId).toLowerCase();
+    return realSensors.filter(s => (s.provinsi || '').toLowerCase().includes(targetName));
   }
 
   return realSensors;
@@ -59,15 +72,13 @@ export default function Dashboard() {
   const userProv = localStorage.getItem('ocean_provinsi') || '';
 
   const getProvId = (provName) => {
-    if (!provName) return 'jabar';
-    const lower = provName.toLowerCase();
-    if (lower.includes('barat')) return 'jabar';
-    if (lower.includes('timur')) return 'jatim';
-    if (lower.includes('tengah')) return 'jateng';
-    if (lower.includes('dki') || lower.includes('jakarta')) return 'dki';
-    if (lower.includes('banten')) return 'banten';
-    if (lower.includes('bali')) return 'bali';
-    return 'jabar';
+    if (!provName) return 'all';
+    const lower = provName.trim().toLowerCase();
+    for (const [id, matcher] of Object.entries(PROVINCE_MATCHERS)) {
+      if (matcher(lower)) return id;
+    }
+    const matched = PROVINCES.find(p => p.name.toLowerCase() === lower || p.id === lower);
+    return matched ? matched.id : 'all';
   };
 
   const getKabId = (provId, wilName) => {

@@ -171,7 +171,8 @@ export default function LoginPage({ onLogin }) {
         const res = await api.post('/login/google', {
           email: userInfo.data.email,
           nama: userInfo.data.name || userInfo.data.given_name,
-          google_id: userInfo.data.sub
+          google_id: userInfo.data.sub,
+          picture: userInfo.data.picture,
         });
         setIsLoading(false);
         localStorage.setItem('ocean_user', JSON.stringify({ id: res.data.id, name: res.data.name, email: res.data.email, picture: userInfo.data.picture, no_hp: res.data.no_hp || '' }));
@@ -179,10 +180,13 @@ export default function LoginPage({ onLogin }) {
         navigate('/dashboard');
       } catch (err) {
         setIsLoading(false);
-        setErrorMsg(err.response?.data?.detail || 'Akun Google Anda belum terdaftar.');
+        setErrorMsg(err.response?.data?.detail || 'Login Google gagal. Pastikan server backend dan database sudah berjalan.');
       }
     },
-    onError: () => setErrorMsg('Login Google gagal.')
+    onError: (err) => {
+      console.error('Google Login error:', err);
+      setErrorMsg('Login Google gagal. Pastikan URL localhost:5173 diizinkan di Google Cloud Console.');
+    }
   });
 
   const inputStyle = {

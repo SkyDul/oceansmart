@@ -1,52 +1,65 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Sliders, Radio, Wifi, WifiOff, RefreshCw, Zap, SlidersHorizontal,
   CloudLightning, Thermometer, Droplets, Database, Shield, Users, RefreshCcw
 } from 'lucide-react';
-import api from '../api';
+import api, { getSandboxState } from '../api';
 
 export default function SimulatorPage() {
   const [simulatorStatus, setSimulatorStatus] = useState(null);
   const [sensors, setSensors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
-  const userRole = localStorage.getItem('ocean_role') || 'pengguna';
-  const userWilayah = localStorage.getItem('ocean_wilayah') || '';
 
-  const fetchStatusAndSensors = async () => {
+  const saveSandbox = (nextSandbox) => {
+    const updated = { ...nextSandbox, last_run: new Date().toISOString() };
+    localStorage.setItem('ocean_sandbox', JSON.stringify(updated));
+    return updated;
+  };
+
+  const computeStatusFromSensors = (sandbox, sensorList) => {
+    const online = sensorList.filter(s => s.status_koneksi === 'online').length;
+    const offline = sensorList.filter(s => s.status_koneksi === 'offline').length;
+    const maintenance = sensorList.filter(s => s.status_koneksi === 'maintenance').length;
+    return {
+      active_anomaly: sandbox.active_anomaly || 'normal',
+      drain_battery: Boolean(sandbox.drain_battery),
+      last_run: sandbox.last_run || new Date().toISOString(),
+      sensors_summary: {
+        total: sensorList.length,
+        online,
+        offline,
+        maintenance,
+      },
+    };
+  };
+
+  const fetchStatusAndSensors = useCallback(async () => {
     try {
-      const [statusRes, sensorsRes] = await Promise.all([
-        api.get('/simulator/status'),
-        api.get('/sensors')
-      ]);
-      setSimulatorStatus(statusRes.data);
-      // Filter sensors if operator has specific wilayah
-      let sensorList = sensorsRes.data;
-      if (userRole === 'operator' && userWilayah) {
-        sensorList = sensorList.filter(s => s.wilayah === userWilayah);
-      }
+      const sensorsRes = await api.get('/sensors');
+      const sensorList = Array.isArray(sensorsRes.data) ? sensorsRes.data : [];
+      const sandbox = getSandboxState();
       setSensors(sensorList);
+      setSimulatorStatus(computeStatusFromSensors(sandbox, sensorList));
     } catch (e) {
-      console.error("Gagal mengambil data simulator:", e);
+      console.error("Gagal mengambil data sensor:", e);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchStatusAndSensors();
-    // Auto-update every 10 seconds to align with scheduler
     const interval = setInterval(fetchStatusAndSensors, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchStatusAndSensors]);
 
   const handleTriggerAnomaly = async (anomaly) => {
     setActionLoading(true);
     try {
-      await api.post('/simulator/trigger', { active_anomaly: anomaly });
+      const current = getSandboxState();
+      saveSandbox({ ...current, active_anomaly: anomaly });
       await fetchStatusAndSensors();
-    } catch (e) {
-      alert("Gagal memicu anomali: " + (e.response?.data?.detail || e.message));
     } finally {
       setActionLoading(false);
     }
@@ -55,10 +68,9 @@ export default function SimulatorPage() {
   const handleToggleBatteryDrain = async (val) => {
     setActionLoading(true);
     try {
-      await api.post('/simulator/trigger', { drain_battery: val });
+      const current = getSandboxState();
+      saveSandbox({ ...current, drain_battery: val });
       await fetchStatusAndSensors();
-    } catch (e) {
-      alert("Gagal mengubah status drain baterai: " + (e.response?.data?.detail || e.message));
     } finally {
       setActionLoading(false);
     }
@@ -70,10 +82,11 @@ export default function SimulatorPage() {
     const nextIndex = (statuses.indexOf(currentStatus) + 1) % statuses.length;
     const nextStatus = statuses[nextIndex];
     try {
-      await api.post(`/simulator/sensors/${sensorId}/status`, { status: nextStatus });
+      const current = getSandboxState();
+      const overrides = { ...(current.sensor_overrides || {}) };
+      overrides[sensorId] = { ...(overrides[sensorId] || {}), status_koneksi: nextStatus };
+      saveSandbox({ ...current, sensor_overrides: overrides });
       await fetchStatusAndSensors();
-    } catch (e) {
-      alert("Gagal mengubah status sensor: " + (e.response?.data?.detail || e.message));
     } finally {
       setActionLoading(false);
     }
@@ -82,23 +95,22 @@ export default function SimulatorPage() {
   const handleRecharge = async (sensorId) => {
     setActionLoading(true);
     try {
-      await api.post(`/simulator/sensors/${sensorId}/recharge`);
+      const current = getSandboxState();
+      const overrides = { ...(current.sensor_overrides || {}) };
+      overrides[sensorId] = { ...(overrides[sensorId] || {}), status_baterai: 100 };
+      saveSandbox({ ...current, sensor_overrides: overrides });
       await fetchStatusAndSensors();
-    } catch (e) {
-      alert("Gagal mengisi baterai: " + (e.response?.data?.detail || e.message));
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleResetSimulator = async () => {
-    if (!window.confirm("Apakah Anda yakin ingin mereset seluruh simulator? Semua sensor akan kembali ONLINE, baterai 100%, dan anomali dibersihkan.")) return;
+    if (!window.confirm("Apakah Anda yakin ingin mereset seluruh simulator? Semua sensor di mode sandbox Anda akan kembali normal.")) return;
     setActionLoading(true);
     try {
-      await api.post('/simulator/reset');
+      localStorage.removeItem('ocean_sandbox');
       await fetchStatusAndSensors();
-    } catch (e) {
-      alert("Gagal mereset simulator: " + (e.response?.data?.detail || e.message));
     } finally {
       setActionLoading(false);
     }
