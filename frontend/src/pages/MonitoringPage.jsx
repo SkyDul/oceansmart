@@ -75,7 +75,11 @@ export default function MonitoringPage() {
 
     fetchSensors();
     const interval = setInterval(fetchSensors, 10000);
-    return () => clearInterval(interval);
+    window.addEventListener('ocean_sandbox_updated', fetchSensors);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('ocean_sandbox_updated', fetchSensors);
+    };
   }, [selectedWilayah, userRole]);
 
   // --- Handle sensorId from URL param ---
@@ -161,7 +165,8 @@ export default function MonitoringPage() {
         {/* FILTER BAR */}
         <div style={{
           background: 'linear-gradient(135deg, #ffffff, #f8fafc)',
-          border: '1px solid #e2e8f0',
+          border: 'none',
+          outline: 'none',
           borderRadius: '1.25rem',
           padding: '0.55rem 1rem',
           boxShadow: '0 4px 20px -2px rgba(15, 23, 42, 0.05)',

@@ -120,7 +120,11 @@ export default function Dashboard() {
 
     fetchData();
     const interval = setInterval(fetchData, 8000);
-    return () => clearInterval(interval);
+    window.addEventListener('ocean_sandbox_updated', fetchData);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('ocean_sandbox_updated', fetchData);
+    };
   }, []);
 
   // Save selected regions to local storage
@@ -245,7 +249,8 @@ export default function Dashboard() {
         {/* ULTRA-SLEEK PILL FILTER BAR */}
         <div style={{
           background: 'linear-gradient(135deg, #ffffff, #f8fafc)',
-          border: '1px solid #e2e8f0',
+          border: 'none',
+          outline: 'none',
           borderRadius: '1.25rem',
           padding: '0.55rem 1rem',
           boxShadow: '0 4px 20px -2px rgba(15, 23, 42, 0.05)',

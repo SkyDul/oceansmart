@@ -4,6 +4,7 @@ import { useState, useEffect, lazy, Suspense } from 'react';
 import { AlertProvider } from './components/AlertNotifier';
 import Sidebar from './components/Sidebar';
 import ChatbotWidget from './components/ChatbotWidget';
+import SimulatorWidget from './components/SimulatorWidget';
 import './index.css';
 
 // Lazy-loaded pages (code splitting agar loading awal di HP nelayan sangat ringan)
@@ -39,6 +40,7 @@ const ProtectedLayout = ({ children }) => {
         {children}
       </main>
       <ChatbotWidget />
+      <SimulatorWidget />
     </div>
   );
 };
@@ -105,7 +107,7 @@ function App() {
             } />
             <Route path="/terms" element={<TermsPage />} />
 
-          {/* Protected Routes — semua role */}
+          {/* Protected Routes â€” semua role */}
           <Route path="/dashboard" element={isAuthenticated ? <ProtectedLayout><Dashboard userRole={userRole} onLogout={handleLogout} /></ProtectedLayout> : <Navigate to="/login" />} />
           <Route path="/map" element={isAuthenticated ? <ProtectedLayout><MapPage /></ProtectedLayout> : <Navigate to="/login" />} />
           <Route path="/digital-twin" element={isAuthenticated ? <ProtectedLayout><DigitalTwinPage /></ProtectedLayout> : <Navigate to="/login" />} />
@@ -114,6 +116,7 @@ function App() {
           <Route path="/biota" element={isAuthenticated ? <ProtectedLayout><BiotaPage /></ProtectedLayout> : <Navigate to="/login" />} />
           <Route path="/alerts" element={isAuthenticated ? <ProtectedLayout><AlertsPage /></ProtectedLayout> : <Navigate to="/login" />} />
           <Route path="/profile" element={isAuthenticated ? <ProtectedLayout><ProfilePage /></ProtectedLayout> : <Navigate to="/login" />} />
+          <Route path="/simulator" element={isAuthenticated ? <ProtectedLayout><SimulatorPage /></ProtectedLayout> : <Navigate to="/login" />} />
           {/* Operator-Only Routes */}
           <Route path="/operator" element={
             <OperatorRoute isAuthenticated={isAuthenticated} userRole={userRole}>

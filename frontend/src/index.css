@@ -160,6 +160,17 @@ button {
   pointer-events: none;
 }
 
+.sidebar:not(:hover) .sidebar-logout-btn {
+  justify-content: center !important;
+  padding: 0 !important;
+  gap: 0 !important;
+}
+
+.sidebar:not(:hover) .sidebar-mute-btn {
+  flex: 1 1 100% !important;
+  width: 100% !important;
+}
+
 .sidebar-brand {
   padding: 1.5rem 1.25rem;
   display: flex;
@@ -925,6 +936,48 @@ button {
   .biota-modal-backdrop {
     left: 0;
   }
+}
+
+/* ══════════════════════ MAP RADAR PULSE (BAHAYA / WASPADA) ══════════════════════ */
+.map-radar-icon {
+  background: transparent;
+  border: none;
+  pointer-events: none;
+}
+
+.map-radar-pulse {
+  display: block;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 3px solid #dc2626;
+  background: rgba(220, 38, 38, 0.25);
+  animation: mapRadarRipple 1.6s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes mapRadarRipple {
+  0% {
+    transform: scale(0.45);
+    opacity: 0.95;
+  }
+  100% {
+    transform: scale(1.45);
+    opacity: 0;
+  }
+}
+
+/* ══════════════════════ MODEL VIEWER ══════════════════════ */
+model-viewer::part(default-progress-bar) {
+  display: none !important;
+  opacity: 0 !important;
+  height: 0 !important;
+}
+
+/* Hilangkan focus ring hitam bawaan browser */
+*:focus,
+*:focus-visible {
+  outline: none !important;
 }
 
 /* ══════════════════════ SCROLLBAR ══════════════════════ */

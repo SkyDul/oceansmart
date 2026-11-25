@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Sliders, Radio, Wifi, WifiOff, RefreshCw, Zap, SlidersHorizontal,
-  CloudLightning, Thermometer, Droplets, Database, Shield, Users, RefreshCcw
+  CloudLightning, Thermometer, Droplets, Database, Shield, Users, RefreshCcw, AlertTriangle, CheckCircle, X
 } from 'lucide-react';
 import api, { getSandboxState } from '../api';
 
@@ -10,10 +10,19 @@ export default function SimulatorPage() {
   const [sensors, setSensors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const userWilayah = localStorage.getItem('ocean_wilayah') || '';
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+
+  const showToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(''), 3500);
+  };
 
   const saveSandbox = (nextSandbox) => {
     const updated = { ...nextSandbox, last_run: new Date().toISOString() };
     localStorage.setItem('ocean_sandbox', JSON.stringify(updated));
+    window.dispatchEvent(new Event('ocean_sandbox_updated'));
     return updated;
   };
 
@@ -105,12 +114,18 @@ export default function SimulatorPage() {
     }
   };
 
-  const handleResetSimulator = async () => {
-    if (!window.confirm("Apakah Anda yakin ingin mereset seluruh simulator? Semua sensor di mode sandbox Anda akan kembali normal.")) return;
+  const handleResetSimulator = () => {
+    setShowResetModal(true);
+  };
+
+  const handleConfirmReset = async () => {
+    setShowResetModal(false);
     setActionLoading(true);
     try {
       localStorage.removeItem('ocean_sandbox');
+      window.dispatchEvent(new Event('ocean_sandbox_updated'));
       await fetchStatusAndSensors();
+      showToast('Simulator berhasil direset ke kondisi normal!');
     } finally {
       setActionLoading(false);
     }
@@ -234,7 +249,7 @@ export default function SimulatorPage() {
               <Shield size={14} color="#38bdf8" /> Admin / Developer
             </h3>
             <p style={{ fontSize: '0.78rem', color: '#94a3b8', margin: 0, lineHeight: 1.4 }}>
-              Dapat memicu bencana global (*anomaly events*) seperti Heatwave dan Asidifikasi, serta mengelola akun Operator Wilayah.
+              Dapat memicu bencana global (anomaly events) seperti Heatwave dan Asidifikasi, serta mengelola akun Operator Wilayah.
             </p>
           </div>
           <div style={{ borderLeft: '3px solid #10b981', paddingLeft: '0.875rem' }}>
@@ -526,6 +541,129 @@ export default function SimulatorPage() {
           </div>
         )}
       </div>
+      {/* Toast Notification Modern */}
+      {toastMessage && (
+        <div style={{
+          position: 'fixed',
+          top: 24,
+          right: 24,
+          zIndex: 9999,
+          background: '#0f172a',
+          color: '#f8fafc',
+          padding: '0.85rem 1.4rem',
+          borderRadius: '0.75rem',
+          boxShadow: '0 10px 30px rgba(0,0,0,0.25)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          border: '1px solid #334155',
+          fontSize: '0.875rem',
+          fontWeight: 600
+        }}>
+          <CheckCircle size={18} color="#10b981" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* Modal Dialog Konfirmasi Elegan */}
+      {showResetModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 9998,
+          background: 'rgba(15, 23, 42, 0.65)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1rem'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '1rem',
+            width: '100%',
+            maxWidth: 440,
+            padding: '1.75rem',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            border: '1px solid #e2e8f0',
+            position: 'relative'
+          }}>
+            <button
+              onClick={() => setShowResetModal(false)}
+              style={{
+                position: 'absolute',
+                top: 16,
+                right: 16,
+                background: 'transparent',
+                border: 'none',
+                color: '#94a3b8',
+                cursor: 'pointer'
+              }}
+            >
+              <X size={20} />
+            </button>
+
+            <div style={{
+              width: 48,
+              height: 48,
+              borderRadius: '50%',
+              background: '#fef2f2',
+              color: '#dc2626',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: '1rem'
+            }}>
+              <AlertTriangle size={24} />
+            </div>
+
+            <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
+              Reset Seluruh Simulator?
+            </h3>
+
+            <p style={{ margin: '0 0 1.5rem 0', fontSize: '0.875rem', color: '#64748b', lineHeight: 1.5 }}>
+              Semua pengaturan sensor di mode sandbox Anda akan dikembalikan ke kondisi normal dan anomali aktif akan dibatalkan.
+            </p>
+
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={() => setShowResetModal(false)}
+                style={{
+                  padding: '0.625rem 1.25rem',
+                  background: '#f1f5f9',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '0.5rem',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  color: '#475569',
+                  cursor: 'pointer'
+                }}
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmReset}
+                disabled={actionLoading}
+                style={{
+                  padding: '0.625rem 1.25rem',
+                  background: '#dc2626',
+                  border: 'none',
+                  borderRadius: '0.5rem',
+                  fontSize: '0.875rem',
+                  fontWeight: 700,
+                  color: '#ffffff',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(220,38,38,0.3)'
+                }}
+              >
+                {actionLoading ? 'Mereset...' : 'Ya, Reset Simulator'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

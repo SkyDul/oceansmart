@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polygon, CircleMarker, useMap } from 'react-leaflet';
 import { useNavigate } from 'react-router-dom';
 import { MapPin, Layers, Info, Search, Shield, Activity, ArrowRight, Radio, Compass, Plus, Trash2, X } from 'lucide-react';
@@ -31,8 +31,9 @@ function getHealthStatus(index) {
 }
 
 // Controller component to handle map flyTo animations dynamically
-function MapController({ activeSensor }) {
+function MapController({ activeSensor, selectedWilayah, sensors }) {
   const map = useMap();
+
   useEffect(() => {
     if (activeSensor && map) {
       map.flyTo([activeSensor.lat, activeSensor.lng], 14, {
@@ -41,6 +42,27 @@ function MapController({ activeSensor }) {
       });
     }
   }, [activeSensor, map]);
+
+  useEffect(() => {
+    if (!map) return;
+
+    if (!selectedWilayah || selectedWilayah === 'all') {
+      map.flyTo([-2.5489, 118.0149], 5, { animate: true, duration: 1.5 });
+      return;
+    }
+
+    const matched = (sensors || []).filter(
+      s => (s.wilayah || '').toLowerCase() === selectedWilayah.toLowerCase() && s.lat && s.lng
+    );
+
+    if (matched.length === 1) {
+      map.flyTo([matched[0].lat, matched[0].lng], 12, { animate: true, duration: 1.5 });
+    } else if (matched.length > 1) {
+      const bounds = matched.map(s => [s.lat, s.lng]);
+      map.fitBounds(bounds, { padding: [60, 60], maxZoom: 13, animate: true, duration: 1.5 });
+    }
+  }, [selectedWilayah, sensors, map]);
+
   return null;
 }
 
@@ -102,24 +124,30 @@ export default function MapPage() {
     // Fetch wilayah list for dropdown
     api.get('/wilayah').then(res => setWilayahList(res.data)).catch(() => {});
 
-    Promise.all([
-      api.get('/sensors'),
-      api.get('/zones'),
-      api.get('/health-index'),
-    ])
-      .then(([senRes, zoneRes, healthRes]) => {
-        const fetchedSensors = senRes.data;
-        setSensors(fetchedSensors);
-        setZones(zoneRes.data);
-        setHealthData(healthRes.data);
-        
-        // Auto focus map to operator's first sensor on load
-        if (userRole === 'operator' && fetchedSensors.length > 0) {
-          setActiveSensor(fetchedSensors[0]);
-        }
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    const fetchMapData = () => {
+      Promise.all([
+        api.get('/sensors'),
+        api.get('/zones'),
+        api.get('/health-index'),
+      ])
+        .then(([senRes, zoneRes, healthRes]) => {
+          const fetchedSensors = senRes.data;
+          setSensors(fetchedSensors);
+          setZones(zoneRes.data);
+          setHealthData(healthRes.data);
+
+          // Auto focus map to operator's first sensor on load
+          if (userRole === 'operator' && fetchedSensors.length > 0) {
+            setActiveSensor(prev => prev || fetchedSensors[0]);
+          }
+        })
+        .catch(console.error)
+        .finally(() => setLoading(false));
+    };
+
+    fetchMapData();
+    window.addEventListener('ocean_sandbox_updated', fetchMapData);
+    return () => window.removeEventListener('ocean_sandbox_updated', fetchMapData);
   }, []);
 
   if (loading) {
@@ -267,7 +295,7 @@ export default function MapPage() {
             />
 
             {/* Map dynamic controller for flyTo */}
-            <MapController activeSensor={activeSensor} />
+            <MapController activeSensor={activeSensor} selectedWilayah={selectedWilayah} sensors={sensors} />
 
             {/* Conservation Zones Polygons */}
             {showZones && zones.map(zone => {
@@ -306,14 +334,26 @@ export default function MapPage() {
             {/* Sensors Markers */}
             {sensors.map(sensor => {
               const health = healthData.find(h => h.sensor_id === sensor.sensor_id);
-              const idx = health?.health_index || 0;
+              const idx = sensor.latest_reading?.health_index ?? health?.health_index ?? 0;
               const color = getHealthColor(idx);
+              const isAlertLevel = idx < 70;
+              const pulseIcon = isAlertLevel
+                ? L.divIcon({
+                    className: 'map-radar-icon',
+                    html: `<span class="map-radar-pulse" style="border-color: ${color}; background: ${color}33;"></span>`,
+                    iconSize: [44, 44],
+                    iconAnchor: [22, 22],
+                  })
+                : null;
 
               return showHealth ? (
-                <CircleMarker
-                  key={sensor.sensor_id}
-                  center={[sensor.lat, sensor.lng]}
-                  radius={13}
+                <Fragment key={sensor.sensor_id}>
+                  {pulseIcon && (
+                    <Marker position={[sensor.lat, sensor.lng]} icon={pulseIcon} interactive={false} />
+                  )}
+                  <CircleMarker
+                    center={[sensor.lat, sensor.lng]}
+                    radius={13}
                   pathOptions={{
                     color: color,
                     fillColor: color,
@@ -355,6 +395,7 @@ export default function MapPage() {
                     </div>
                   </Popup>
                 </CircleMarker>
+                </Fragment>
               ) : (
                 <Marker key={sensor.sensor_id} position={[sensor.lat, sensor.lng]}>
                   <Popup>

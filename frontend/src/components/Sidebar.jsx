@@ -1,7 +1,7 @@
 import { NavLink, Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Map, Activity, Fish,
-  AlertTriangle, Globe, Settings, LogOut, Anchor, Sliders
+  AlertTriangle, Globe, Settings, LogOut, Anchor, Volume2, VolumeX
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAlert } from './AlertNotifier';
@@ -13,7 +13,6 @@ const navItemsAll = [
   { path: '/monitoring', label: 'Monitoring', icon: Activity },
   { path: '/biota', label: 'Biota Laut', icon: Fish },
   { path: '/alerts', label: 'Peringatan', icon: AlertTriangle, hasBadge: true },
-  { path: '/simulator', label: 'Lab Simulasi', icon: Sliders, penggunaOnly: true },
 ];
 
 const operatorItems = [
@@ -22,7 +21,7 @@ const operatorItems = [
 
 export default function Sidebar() {
   const location = useLocation();
-  const { alerts } = useAlert();
+  const { alerts, isMuted, toggleMute } = useAlert();
 
   const savedUser = JSON.parse(localStorage.getItem('ocean_user') || '{}');
   const userRole = localStorage.getItem('ocean_role') || 'pengguna';
@@ -120,14 +119,33 @@ export default function Sidebar() {
             </div>
           </Link>
         )}
-        <button onClick={handleLogout}
-          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '0.6rem 0.75rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '0.5rem', color: 'rgba(255,255,255,0.7)', fontSize: '0.8125rem', cursor: 'pointer', transition: 'all 0.25s' }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(220,38,38,0.2)'; e.currentTarget.style.color = '#fca5a5'; e.currentTarget.style.borderColor = 'rgba(220,38,38,0.3)'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = 'rgba(255,255,255,0.7)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; }}
-        >
-          <LogOut size={18} style={{ flexShrink: 0 }} />
-          <span className="sidebar-text">Keluar</span>
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <button onClick={handleLogout}
+            className="sidebar-logout-btn"
+            style={{ flex: '1 1 110px', height: 38, display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 12, padding: '0 0.75rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '0.5rem', color: 'rgba(255,255,255,0.7)', fontSize: '0.8125rem', cursor: 'pointer', transition: 'all 0.25s' }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(220,38,38,0.2)'; e.currentTarget.style.color = '#fca5a5'; e.currentTarget.style.borderColor = 'rgba(220,38,38,0.3)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = 'rgba(255,255,255,0.7)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; }}
+          >
+            <LogOut size={18} style={{ flexShrink: 0 }} />
+            <span className="sidebar-text">Keluar</span>
+          </button>
+          <button
+            onClick={toggleMute}
+            className="sidebar-mute-btn"
+            title={isMuted ? 'Alarm Dibisukan — Klik untuk nyalakan' : 'Suara Alarm Aktif — Klik untuk bisukan'}
+            style={{
+              width: 38, height: 38, flex: '0 0 38px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: isMuted ? 'rgba(255,255,255,0.04)' : 'rgba(14, 165, 233, 0.18)',
+              border: isMuted ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(56, 189, 248, 0.35)',
+              borderRadius: '0.5rem',
+              color: isMuted ? 'rgba(255,255,255,0.55)' : '#7dd3fc',
+              cursor: 'pointer', transition: 'all 0.2s'
+            }}
+          >
+            {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+          </button>
+        </div>
       </div>
     </aside>
   );

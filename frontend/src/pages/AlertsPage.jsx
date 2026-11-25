@@ -38,7 +38,11 @@ export default function AlertsPage() {
 
     fetchStaticData();
     const timer = setInterval(fetchStaticData, 15000);
-    return () => clearInterval(timer);
+    window.addEventListener('ocean_sandbox_updated', fetchStaticData);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('ocean_sandbox_updated', fetchStaticData);
+    };
   }, []);
 
   // Sensors filtered by wilayah
@@ -205,22 +209,6 @@ export default function AlertsPage() {
 
       <div className="page-body fade-in">
 
-        {/* Status Legend */}
-        <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '0.875rem', padding: '0.6rem 1.1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '0.6875rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0 }}>Keterangan:</span>
-          {[
-            { dot: '#dc2626', label: 'Bahaya', desc: 'Peringatan aktif' },
-            { dot: '#d97706', label: 'Waspada', desc: 'Peringatan aktif' },
-            { dot: '#10b981', label: 'Normal', desc: 'Kondisi sensor saat ini' },
-          ].map(({ dot, label, desc }) => (
-            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <span style={{ width: 9, height: 9, borderRadius: '50%', background: dot, display: 'inline-block', flexShrink: 0 }} />
-              <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#334155' }}>{label}</span>
-              <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>— {desc}</span>
-            </div>
-          ))}
-        </div>
-
         {/* Filter Bar */}
         <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '0.875rem', padding: '0.6rem 1rem', boxShadow: '0 1px 4px rgba(0,0,0,0.04)', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#0369a1', fontWeight: 700, fontSize: '0.8125rem', flexShrink: 0, marginRight: '0.25rem' }}>
@@ -296,7 +284,9 @@ export default function AlertsPage() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '1rem',
-                boxShadow: selectedPriority === key ? '0 0 0 3px #0f172a' : '0 4px 16px rgba(0,0,0,0.06)',
+                boxShadow: selectedPriority === key ? '0 10px 24px rgba(15, 23, 42, 0.18)' : '0 4px 16px rgba(0,0,0,0.06)',
+                transform: selectedPriority === key ? 'translateY(-2px)' : 'none',
+                outline: 'none',
                 color: '#fff',
                 cursor: 'pointer',
                 transition: 'transform 0.15s, box-shadow 0.15s',

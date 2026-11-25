@@ -71,8 +71,8 @@ api.interceptors.response.use((response) => {
 
   const url = response.config?.url || '';
 
-  // 1. Apply to /sensors list
-  if (url.endsWith('/sensors') && Array.isArray(response.data)) {
+  // 1. Apply to /sensors list (including ?wilayah= filter)
+  if (url.includes('/sensors') && !url.includes('/readings') && Array.isArray(response.data)) {
     response.data = response.data.map((s) => {
       const ov = sandbox.sensor_overrides[s.sensor_id] || {};
       const battery = ov.status_baterai !== undefined
@@ -85,6 +85,21 @@ api.interceptors.response.use((response) => {
         latest_reading: applySandboxToReading(s.latest_reading, sandbox.active_anomaly),
       };
     });
+  }
+
+  // 1b. Apply to /health-index
+  if (url.includes('/health-index') && Array.isArray(response.data) && sandbox.active_anomaly !== 'normal') {
+    response.data = response.data.map((h) => ({
+      ...h,
+      health_index: applySandboxToReading({ health_index: h.health_index }, sandbox.active_anomaly).health_index,
+    }));
+  }
+
+  // 1c. Apply to latest /readings on MonitoringPage
+  if (url.includes('/readings') && Array.isArray(response.data) && response.data.length > 0 && sandbox.active_anomaly !== 'normal') {
+    response.data = response.data.map((r, idx) =>
+      idx === 0 ? applySandboxToReading(r, sandbox.active_anomaly) : r
+    );
   }
 
   // 2. Apply to /dashboard/summary
